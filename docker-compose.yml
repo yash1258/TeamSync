@@ -10,3 +10,9 @@ services:
       - .env.production
     ports:
       - "127.0.0.1:${APP_PORT:-3010}:3000"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as budget from "../budget.js";
 import type * as calendar from "../calendar.js";
 import type * as dashboard from "../dashboard.js";
+import type * as documents from "../documents.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as seed from "../seed.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   budget: typeof budget;
   calendar: typeof calendar;
   dashboard: typeof dashboard;
+  documents: typeof documents;
   http: typeof http;
   invites: typeof invites;
   seed: typeof seed;

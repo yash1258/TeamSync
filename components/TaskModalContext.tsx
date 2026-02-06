@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 import type { Id } from '@/convex/_generated/dataModel';
 
 interface TaskModalContextType {
@@ -14,11 +14,15 @@ const TaskModalContext = createContext<TaskModalContextType | undefined>(undefin
 export function TaskModalProvider({ children }: { children: ReactNode }) {
     const [selectedTaskId, setSelectedTaskId] = useState<Id<"tasks"> | null>(null);
 
-    const openTask = (taskId: Id<"tasks">) => setSelectedTaskId(taskId);
-    const closeTask = () => setSelectedTaskId(null);
+    const openTask = useCallback((taskId: Id<"tasks">) => setSelectedTaskId(taskId), []);
+    const closeTask = useCallback(() => setSelectedTaskId(null), []);
+    const value = useMemo(
+        () => ({ selectedTaskId, openTask, closeTask }),
+        [selectedTaskId, openTask, closeTask]
+    );
 
     return (
-        <TaskModalContext.Provider value={{ selectedTaskId, openTask, closeTask }}>
+        <TaskModalContext.Provider value={value}>
             {children}
         </TaskModalContext.Provider>
     );

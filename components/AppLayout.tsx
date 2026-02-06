@@ -24,16 +24,18 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     // Check if user is a team member
     const currentMember = useQuery(api.teamMembers.getCurrentMember);
-    const [showOnboarding, setShowOnboarding] = useState(false);
+    const showOnboarding =
+        isAuthenticated &&
+        !isAuthLoading &&
+        currentMember === null &&
+        pathname !== '/login' &&
+        pathname !== '/join';
 
     useEffect(() => {
-        // If logged in, not a member, not loading auth, and not on login/join pages
-        if (isAuthenticated && !isAuthLoading && currentMember === null && pathname !== '/login' && pathname !== '/join') {
-            setShowOnboarding(true);
-        } else {
-            setShowOnboarding(false);
+        if (selectedTaskId) {
+            closeTask();
         }
-    }, [isAuthenticated, isAuthLoading, currentMember, pathname]);
+    }, [pathname, selectedTaskId, closeTask]);
 
     // Determine if we should show sidebar (not on profile/settings)
     const showSidebar = !pathname.startsWith('/profile') && !pathname.startsWith('/settings');
@@ -65,7 +67,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <TaskModal taskId={selectedTaskId} onClose={closeTask} />
             )}
 
-            <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+            <OnboardingModal isOpen={showOnboarding} onClose={() => { }} />
         </div>
     );
 }

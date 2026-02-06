@@ -6,6 +6,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 import { AddTaskModal } from '@/components/AddTaskModal';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { Id } from '@/convex/_generated/dataModel';
 
 type ColumnStatus = 'todo' | 'in-progress' | 'review' | 'done';
@@ -25,11 +26,14 @@ const columns: Column[] = [
 
 export function TaskBoard() {
   const { openTask } = useTaskModal();
-  const [searchQuery, setSearchQuery] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'team' | 'personal'>('team');
   const [showAddModal, setShowAddModal] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const searchQuery = searchParams.get('q') ?? '';
 
   // Get current user's team member ID (for personal tasks filtering)
   // For now, we'll use email matching - in production, link auth user to team member
@@ -64,6 +68,17 @@ export function TaskBoard() {
 
     return () => observer.disconnect();
   }, [tasks]);
+
+  const handleSearchChange = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value.trim()) {
+      params.set('q', value);
+    } else {
+      params.delete('q');
+    }
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  };
 
   const filteredTasks = (tasks ?? []).filter((task) => {
     const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -195,7 +210,7 @@ export function TaskBoard() {
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-48 bg-[#181818] border border-[#232323] rounded-lg pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F0FF7A] transition-colors"
             />
           </div>

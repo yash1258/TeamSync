@@ -68,6 +68,44 @@ const schema = defineSchema({
         createdAt: v.number(),
     }).index("by_task", ["taskId"]),
 
+    // documents: Shared project/team documents
+    documents: defineTable({
+        title: v.string(),
+        fileName: v.string(),
+        description: v.optional(v.string()),
+        tags: v.optional(v.array(v.string())),
+        fileType: v.union(
+            v.literal("pdf"),
+            v.literal("markdown"),
+            v.literal("jsonl"),
+            v.literal("other")
+        ),
+        mimeType: v.string(),
+        size: v.number(),
+        storageId: v.id("_storage"),
+        createdBy: v.id("teamMembers"),
+        currentVersion: v.number(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_createdBy", ["createdBy"])
+        .index("by_updatedAt", ["updatedAt"]),
+
+    // documentVersions: Immutable history of uploaded versions
+    documentVersions: defineTable({
+        documentId: v.id("documents"),
+        version: v.number(),
+        storageId: v.id("_storage"),
+        fileName: v.string(),
+        mimeType: v.string(),
+        size: v.number(),
+        uploadedBy: v.id("teamMembers"),
+        changeNote: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index("by_document", ["documentId"])
+        .index("by_document_version", ["documentId", "version"]),
+
     // budgetItems: Budget categories
     budgetItems: defineTable({
         category: v.string(),

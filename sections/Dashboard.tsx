@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import {
     CheckCircle2,
     Clock,
     AlertCircle,
-    TrendingUp,
     Users,
     Wallet,
     ArrowUpRight,
@@ -17,22 +17,55 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 
+type Trend = 'up' | 'down' | 'neutral';
+
+const getGreeting = (hour: number) => {
+    if (hour < 12) return 'morning';
+    if (hour < 18) return 'afternoon';
+    return 'evening';
+};
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+    }).format(amount);
+};
+
 export function Dashboard() {
     const sectionRef = useRef<HTMLDivElement>(null);
+    const [nowMs] = useState(() => Date.now());
     const { openTask } = useTaskModal();
 
     // Fetch real data from Convex
     const dashboardStats = useQuery(api.dashboard.getStats);
     const recentTasks = useQuery(api.tasks.listRecent, { limit: 4 });
     const activityLog = useQuery(api.dashboard.getActivity, { limit: 4 });
+    const currentUser = useQuery(api.users.currentUser);
+
+    const taskCreationTrend: Trend = dashboardStats
+        ? dashboardStats.taskCreationChangePercent > 0
+            ? 'up'
+            : dashboardStats.taskCreationChangePercent < 0
+                ? 'down'
+                : 'neutral'
+        : 'neutral';
+    const budgetRemaining = dashboardStats
+        ? dashboardStats.budgetAllocated - dashboardStats.budgetSpent
+        : 0;
 
     // Build stats array from real data
     const stats = [
         {
             label: 'Total Tasks',
             value: dashboardStats?.totalTasks?.toString() ?? '0',
-            change: '+12%',
-            trend: 'up',
+            change: dashboardStats
+                ? dashboardStats.taskCreationChangePercent === 0
+                    ? 'No change vs last week'
+                    : `${dashboardStats.taskCreationChangePercent > 0 ? '+' : ''}${dashboardStats.taskCreationChangePercent}% vs last week`
+                : 'Loading...',
+            trend: taskCreationTrend,
             icon: CheckCircle2,
             color: 'text-green-400',
             bgColor: 'bg-green-400/10'
@@ -40,8 +73,10 @@ export function Dashboard() {
         {
             label: 'In Progress',
             value: dashboardStats?.inProgress?.toString() ?? '0',
-            change: '+4%',
-            trend: 'up',
+            change: dashboardStats && dashboardStats.totalTasks > 0
+                ? `${Math.round((dashboardStats.inProgress / dashboardStats.totalTasks) * 100)}% of all tasks`
+                : 'No tasks yet',
+            trend: 'neutral' as Trend,
             icon: Clock,
             color: 'text-blue-400',
             bgColor: 'bg-blue-400/10'
@@ -49,8 +84,10 @@ export function Dashboard() {
         {
             label: 'Overdue',
             value: dashboardStats?.overdue?.toString() ?? '0',
-            change: dashboardStats?.overdue === 0 ? 'None' : `-${dashboardStats?.overdue ?? 0}`,
-            trend: dashboardStats?.overdue === 0 ? 'neutral' : 'down',
+            change: dashboardStats?.overdue === 0
+                ? 'No overdue tasks'
+                : `${dashboardStats?.dueSoon ?? 0} due this week`,
+            trend: (dashboardStats?.overdue ?? 0) > 0 ? 'down' : 'neutral',
             icon: AlertCircle,
             color: 'text-red-400',
             bgColor: 'bg-red-400/10'
@@ -58,8 +95,12 @@ export function Dashboard() {
         {
             label: 'Budget Used',
             value: `${dashboardStats?.budgetUsedPercent ?? 0}%`,
-            change: 'On track',
-            trend: 'neutral',
+            change: dashboardStats
+                ? budgetRemaining >= 0
+                    ? `${formatCurrency(budgetRemaining)} remaining`
+                    : `${formatCurrency(Math.abs(budgetRemaining))} over budget`
+                : 'Loading...',
+            trend: dashboardStats && (dashboardStats.budgetUsedPercent > 90 || budgetRemaining < 0) ? 'down' : 'neutral',
             icon: Wallet,
             color: 'text-[#F0FF7A]',
             bgColor: 'bg-[#F0FF7A]/10'
@@ -128,39 +169,9 @@ export function Dashboard() {
         }
     };
 
-    // Convert Convex task to UI task format
-    const convertToUITask = (task: any) => ({
-        id: task._id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        assignee: task.assignee ? {
-            id: task.assignee._id,
-            name: task.assignee.name,
-            email: task.assignee.email,
-            role: task.assignee.role,
-            avatar: task.assignee.avatar,
-            department: task.assignee.department,
-            status: task.assignee.status,
-        } : {
-            id: '',
-            name: 'Unassigned',
-            email: '',
-            role: '',
-            avatar: '',
-            department: 'engineering' as const,
-            status: 'offline' as const,
-        },
-        dueDate: task.dueDate,
-        tags: task.tags,
-        comments: [],
-        createdAt: new Date(task.createdAt).toISOString().split('T')[0],
-    });
-
     // Format activity time
     const formatTime = (timestamp: number) => {
-        const diff = Date.now() - timestamp;
+        const diff = nowMs - timestamp;
         const mins = Math.floor(diff / 60000);
         if (mins < 60) return `${mins} min ago`;
         const hours = Math.floor(mins / 60);
@@ -168,8 +179,11 @@ export function Dashboard() {
         return `${Math.floor(hours / 24)} day${hours >= 48 ? 's' : ''} ago`;
     };
 
+    const greeting = getGreeting(new Date(nowMs).getHours());
+    const firstName = currentUser?.name?.split(' ')[0] ?? 'there';
+
     // Loading state
-    if (dashboardStats === undefined || recentTasks === undefined) {
+    if (dashboardStats === undefined || recentTasks === undefined || activityLog === undefined) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-[#F0FF7A]" />
@@ -181,8 +195,10 @@ export function Dashboard() {
         <div ref={sectionRef} className="space-y-6">
             {/* Welcome */}
             <div className="animate-on-scroll opacity-0">
-                <h1 className="text-3xl font-semibold mb-1">Good morning! 👋</h1>
-                <p className="text-gray-400">Here&apos;s what&apos;s happening with your projects today.</p>
+                <h1 className="text-3xl font-semibold mb-1">Good {greeting}, {firstName}.</h1>
+                <p className="text-gray-400">
+                    {dashboardStats.overdue} overdue tasks, {dashboardStats.dueSoon} due this week, and {dashboardStats.onlineMembers} members online.
+                </p>
             </div>
 
             {/* Stats Grid */}
@@ -220,8 +236,10 @@ export function Dashboard() {
                 {/* Recent Tasks */}
                 <div className="lg:col-span-2 animate-on-scroll opacity-0 bg-[#0B0B0B] border border-[#232323] rounded-xl overflow-hidden">
                     <div className="p-5 border-b border-[#232323] flex items-center justify-between">
-                        <h2 className="font-semibold">Recent Tasks</h2>
-                        <button className="text-sm text-[#F0FF7A] hover:underline">View all</button>
+                        <h2 className="font-semibold">Recent Tasks ({recentTasks.length})</h2>
+                        <Link href="/tasks" className="text-sm text-[#F0FF7A] hover:underline">
+                            View all
+                        </Link>
                     </div>
                     <div className="divide-y divide-[#232323]">
                         {(recentTasks ?? []).map((task) => (
@@ -243,7 +261,7 @@ export function Dashboard() {
                                         </div>
                                         <p className="text-sm text-gray-500 truncate mb-2">{task.description}</p>
                                         <div className="flex items-center gap-3">
-                                            {task.assignee && (
+                                            {task.assignee?.avatar && (
                                                 <>
                                                     <img
                                                         src={task.assignee.avatar}
@@ -301,34 +319,35 @@ export function Dashboard() {
                         )}
                     </div>
                     <div className="p-4 border-t border-[#232323]">
-                        <button className="w-full py-2 text-sm text-gray-400 hover:text-white transition-colors">
+                        <Link href="/team" className="block w-full py-2 text-center text-sm text-gray-400 hover:text-white transition-colors">
                             View all activity
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Team Snapshot */}
             <div className="animate-on-scroll opacity-0 grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'New Project', icon: TrendingUp, color: 'bg-blue-500/10 text-blue-400' },
-                    { label: 'Invite Team', icon: Users, color: 'bg-green-500/10 text-green-400' },
-                    { label: 'Schedule Meeting', icon: Clock, color: 'bg-purple-500/10 text-purple-400' },
-                    { label: 'View Reports', icon: Wallet, color: 'bg-amber-500/10 text-amber-400' },
-                ].map((action) => {
-                    const Icon = action.icon;
+                    { label: 'Completed', value: dashboardStats.done, icon: CheckCircle2, color: 'bg-green-500/10 text-green-400' },
+                    { label: 'To Do', value: dashboardStats.todo, icon: Clock, color: 'bg-blue-500/10 text-blue-400' },
+                    { label: 'In Review', value: dashboardStats.review, icon: AlertCircle, color: 'bg-amber-500/10 text-amber-400' },
+                    { label: 'Online Members', value: dashboardStats.onlineMembers, icon: Users, color: 'bg-[#F0FF7A]/10 text-[#F0FF7A]' },
+                ].map((item) => {
+                    const Icon = item.icon;
                     return (
-                        <button
-                            key={action.label}
-                            className="flex items-center gap-3 p-4 bg-[#0B0B0B] border border-[#232323] rounded-xl hover:border-[#333] transition-all duration-200 group"
+                        <div
+                            key={item.label}
+                            className="flex items-center gap-3 p-4 bg-[#0B0B0B] border border-[#232323] rounded-xl"
                         >
-                            <div className={`p-2 rounded-lg ${action.color}`}>
+                            <div className={`p-2 rounded-lg ${item.color}`}>
                                 <Icon className="w-5 h-5" />
                             </div>
-                            <span className="font-medium text-sm group-hover:text-[#F0FF7A] transition-colors">
-                                {action.label}
-                            </span>
-                        </button>
+                            <div>
+                                <p className="text-lg font-semibold">{item.value}</p>
+                                <p className="text-sm text-gray-500">{item.label}</p>
+                            </div>
+                        </div>
                     );
                 })}
             </div>

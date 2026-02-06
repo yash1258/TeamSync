@@ -6,6 +6,8 @@ RUN apk add --no-cache libc6-compat
 
 COPY package.json package-lock.json ./
 RUN npm ci
+# calendar.tsx imports react-day-picker; install it until lockfile is updated upstream
+RUN npm install --no-save react-day-picker --legacy-peer-deps
 
 FROM node:22-alpine AS builder
 WORKDIR /app

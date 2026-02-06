@@ -12,7 +12,11 @@ services:
       - "127.0.0.1:${APP_PORT:-3010}:3000"
     networks:
       - proxy
+      - nginx_proxy_default
 
 networks:
   proxy:
     external: true
+  nginx_proxy_default:
+    external: true
+    name: nginx-proxy_default

@@ -31,11 +31,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         pathname !== '/login' &&
         pathname !== '/join';
 
+    // Close an open task modal only when route changes.
     useEffect(() => {
-        if (selectedTaskId) {
-            closeTask();
-        }
-    }, [pathname, selectedTaskId, closeTask]);
+        closeTask();
+    }, [pathname, closeTask]);
 
     // Determine if we should show sidebar (not on profile/settings)
     const showSidebar = !pathname.startsWith('/profile') && !pathname.startsWith('/settings');

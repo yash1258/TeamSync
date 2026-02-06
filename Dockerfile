@@ -6,8 +6,18 @@ RUN apk add --no-cache libc6-compat
 
 COPY package.json package-lock.json ./
 RUN npm ci
-# calendar.tsx imports react-day-picker; install it until lockfile is updated upstream
-RUN npm install --no-save react-day-picker --legacy-peer-deps
+# UI components import packages that are currently missing from package-lock.
+# Install them in image build until dependencies are added to package.json+lockfile.
+RUN npm install --no-save --legacy-peer-deps \
+  cmdk \
+  embla-carousel-react \
+  input-otp \
+  next-themes \
+  react-day-picker \
+  react-hook-form \
+  react-resizable-panels \
+  sonner \
+  vaul
 
 FROM node:22-alpine AS builder
 WORKDIR /app

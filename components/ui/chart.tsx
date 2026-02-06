@@ -103,6 +103,16 @@ ${colorConfig
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip
+type ChartValue = number | string | Array<number | string>
+type ChartName = number | string
+type ChartTooltipContentProps = RechartsPrimitive.TooltipContentProps<
+  ChartValue,
+  ChartName
+>
+type ChartLegendContentProps = Pick<
+  RechartsPrimitive.DefaultLegendContentProps,
+  "payload" | "verticalAlign"
+>
 
 function ChartTooltipContent({
   active,
@@ -118,7 +128,7 @@ function ChartTooltipContent({
   color,
   nameKey,
   labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+}: ChartTooltipContentProps &
   React.ComponentProps<"div"> & {
     hideLabel?: boolean
     hideIndicator?: boolean
@@ -259,7 +269,7 @@ function ChartLegendContent({
   verticalAlign = "bottom",
   nameKey,
 }: React.ComponentProps<"div"> &
-  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+  ChartLegendContentProps & {
     hideIcon?: boolean
     nameKey?: string
   }) {

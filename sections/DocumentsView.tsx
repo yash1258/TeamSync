@@ -5,7 +5,7 @@ import {
   FileText,
   FileCode2,
   FileJson,
-  File,
+  File as FileIcon,
   Upload,
   Plus,
   Search,
@@ -75,7 +75,7 @@ const getFileIcon = (fileType: ListedDocument['fileType']) => {
     case 'jsonl':
       return <FileJson className="w-5 h-5 text-emerald-400" />;
     default:
-      return <File className="w-5 h-5 text-gray-400" />;
+      return <FileIcon className="w-5 h-5 text-gray-400" />;
   }
 };
 

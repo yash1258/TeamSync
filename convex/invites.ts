@@ -1,5 +1,6 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 
 // Generate random invite code
@@ -12,31 +13,56 @@ function generateInviteCode(): string {
     return code;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const resolveCurrentMember = async (
+    ctx: MutationCtx | QueryCtx,
+    userId: Id<"users">
+) => {
+    const byUser = await ctx.db
+        .query("teamMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    if (byUser) return byUser;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const email = user.email;
+    if (typeof email !== "string" || email.length === 0) return null;
+
+    return await ctx.db
+        .query("teamMembers")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+};
+
+const requireAdminMember = async (ctx: MutationCtx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const member = await resolveCurrentMember(ctx, userId);
+    if (!member || member.accessLevel !== "admin") {
+        throw new Error("Only admins can manage invite links");
+    }
+
+    return member;
+};
+
 // Create an invite link (admin only)
 export const create = mutation({
     args: {
         expiresInDays: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const userId = await auth.getUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
-        // Get current user's team member record
-        const user = await ctx.db.get(userId);
-        if (!user) throw new Error("User not found");
-
-        const member = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
-            .first();
-
-        if (!member || member.accessLevel !== "admin") {
-            throw new Error("Only admins can create invite links");
+        const member = await requireAdminMember(ctx);
+        const expiresInDays = args.expiresInDays ?? 7;
+        if (expiresInDays <= 0) {
+            throw new Error("Expiration must be at least 1 day.");
         }
 
         const code = generateInviteCode();
-        const expiresInDays = args.expiresInDays ?? 7;
-        const expiresAt = Date.now() + (expiresInDays * 24 * 60 * 60 * 1000);
+        const expiresAt = Date.now() + (expiresInDays * DAY_MS);
 
         const inviteId = await ctx.db.insert("invites", {
             code,
@@ -144,18 +170,67 @@ export const list = query({
         const userId = await auth.getUserId(ctx);
         if (!userId) return [];
 
-        const user = await ctx.db.get(userId);
-        if (!user) return [];
-
-        const member = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
-            .first();
+        const member = await resolveCurrentMember(ctx, userId);
 
         if (!member || member.accessLevel !== "admin") {
             return [];
         }
 
-        return await ctx.db.query("invites").order("desc").collect();
+        const now = Date.now();
+        const invites = await ctx.db.query("invites").order("desc").collect();
+
+        return await Promise.all(
+            invites.map(async (invite) => {
+                const creator = await ctx.db.get(invite.createdBy);
+                return {
+                    ...invite,
+                    creatorName: creator?.name ?? "Unknown",
+                    creatorEmail: creator?.email ?? "",
+                    isExpired: invite.expiresAt < now,
+                    isUsed: !!invite.usedBy,
+                };
+            })
+        );
+    },
+});
+
+// Revoke an invite link (admin only, unused invites only)
+export const revoke = mutation({
+    args: { id: v.id("invites") },
+    handler: async (ctx, args) => {
+        await requireAdminMember(ctx);
+
+        const invite = await ctx.db.get(args.id);
+        if (!invite) throw new Error("Invite not found");
+        if (invite.usedBy) throw new Error("Used invites cannot be revoked");
+
+        await ctx.db.delete(args.id);
+        return { id: args.id };
+    },
+});
+
+// Extend expiry for an invite link (admin only, unused invites only)
+export const extend = mutation({
+    args: {
+        id: v.id("invites"),
+        expiresInDays: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        await requireAdminMember(ctx);
+
+        const invite = await ctx.db.get(args.id);
+        if (!invite) throw new Error("Invite not found");
+        if (invite.usedBy) throw new Error("Used invites cannot be extended");
+
+        const extensionDays = args.expiresInDays ?? 7;
+        if (extensionDays <= 0) {
+            throw new Error("Extension must be at least 1 day.");
+        }
+
+        const baseTime = Math.max(invite.expiresAt, Date.now());
+        const expiresAt = baseTime + (extensionDays * DAY_MS);
+        await ctx.db.patch(invite._id, { expiresAt });
+
+        return { id: invite._id, expiresAt };
     },
 });

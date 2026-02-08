@@ -184,6 +184,27 @@ Acceptance criteria:
 - backend blocks actions that would leave zero admins
 - users can see their current team access level from Settings
 
+### 5.3 Invite lifecycle management
+
+Status: `IN PROGRESS`
+
+Files:
+- `convex/invites.ts`
+- `components/InviteMemberModal.tsx`
+
+Tasks:
+- add backend mutations to revoke and extend invite links ✅
+- keep invite management admin-only with backend enforcement ✅
+- enrich invite list payload with usage/expiration metadata ✅
+- expand invite modal with active invite management and history ✅
+- remaining: add invite audit trail in activity log
+
+Acceptance criteria:
+- admins can generate, copy, extend, and revoke active invite links
+- used invites are not revocable or extendable
+- invite modal shows active invites separately from used/expired history
+- non-admins cannot manage invite lifecycle actions
+
 ## Rollout Order
 
 1. Complete Phase 1 and validate.

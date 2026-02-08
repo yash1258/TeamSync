@@ -177,6 +177,22 @@ const schema = defineSchema({
         ),
         settingsLanguage: v.optional(v.string()),
         settingsTwoFactorEnabled: v.optional(v.boolean()),
+        settingsAccentColor: v.optional(
+            v.union(
+                v.literal("#F0FF7A"),
+                v.literal("#60A5FA"),
+                v.literal("#A78BFA"),
+                v.literal("#F472B6"),
+                v.literal("#34D399")
+            )
+        ),
+        settingsInterfaceDensity: v.optional(
+            v.union(
+                v.literal("compact"),
+                v.literal("comfortable"),
+                v.literal("spacious")
+            )
+        ),
         settingsNotifications: v.optional(
             v.array(
                 v.object({

@@ -33,6 +33,9 @@ interface NotificationSetting {
   inApp: boolean;
 }
 
+type AccentColor = '#F0FF7A' | '#60A5FA' | '#A78BFA' | '#F472B6' | '#34D399';
+type InterfaceDensity = 'compact' | 'comfortable' | 'spacious';
+
 const initialNotifications: NotificationSetting[] = [
   {
     id: 'task_assignments',
@@ -84,6 +87,13 @@ const initialNotifications: NotificationSetting[] = [
   },
 ];
 
+const accentColors: AccentColor[] = ['#F0FF7A', '#60A5FA', '#A78BFA', '#F472B6', '#34D399'];
+const densityOptions: { id: InterfaceDensity; label: string }[] = [
+  { id: 'compact', label: 'Compact' },
+  { id: 'comfortable', label: 'Comfortable' },
+  { id: 'spacious', label: 'Spacious' },
+];
+
 export function SettingsView() {
   const currentUser = useQuery(api.users.currentUser);
   const profile = useQuery(api.users.getProfile);
@@ -94,6 +104,8 @@ export function SettingsView() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
   const [notifications, setNotifications] = useState<NotificationSetting[]>(initialNotifications);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
+  const [accentColor, setAccentColor] = useState<AccentColor>('#F0FF7A');
+  const [interfaceDensity, setInterfaceDensity] = useState<InterfaceDensity>('comfortable');
   const [language, setLanguage] = useState('en');
   const [jobTitle, setJobTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -127,6 +139,8 @@ export function SettingsView() {
     if (!persistedSettings) return;
 
     setTheme(persistedSettings.theme);
+    setAccentColor(persistedSettings.accentColor);
+    setInterfaceDensity(persistedSettings.interfaceDensity);
     setLanguage(persistedSettings.language);
     setTwoFactorEnabled(persistedSettings.twoFactorEnabled);
     setNotifications(
@@ -171,6 +185,8 @@ export function SettingsView() {
       const saveOperations: Promise<unknown>[] = [
         updateSettings({
           theme,
+          accentColor,
+          interfaceDensity,
           language,
           twoFactorEnabled,
           notifications: notifications.map((notification) => ({
@@ -590,10 +606,13 @@ export function SettingsView() {
               <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl p-5">
                 <h3 className="font-semibold mb-4">Accent Color</h3>
                 <div className="flex gap-3">
-                  {['#F0FF7A', '#60A5FA', '#A78BFA', '#F472B6', '#34D399'].map((color) => (
+                  {accentColors.map((color) => (
                     <button
                       key={color}
-                      className="w-10 h-10 rounded-full transition-transform hover:scale-110"
+                      onClick={() => setAccentColor(color)}
+                      aria-label={`Select accent ${color}`}
+                      className={`w-10 h-10 rounded-full transition-transform hover:scale-110 ${accentColor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0B0B0B] scale-105' : ''
+                        }`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -604,15 +623,16 @@ export function SettingsView() {
               <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl p-5">
                 <h3 className="font-semibold mb-4">Interface Density</h3>
                 <div className="space-y-3">
-                  {['Compact', 'Comfortable', 'Spacious'].map((density) => (
-                    <label key={density} className="flex items-center gap-3 p-3 bg-[#181818] rounded-lg cursor-pointer hover:bg-[#232323] transition-colors">
+                  {densityOptions.map((density) => (
+                    <label key={density.id} className="flex items-center gap-3 p-3 bg-[#181818] rounded-lg cursor-pointer hover:bg-[#232323] transition-colors">
                       <input
                         type="radio"
                         name="density"
-                        defaultChecked={density === 'Comfortable'}
+                        checked={interfaceDensity === density.id}
+                        onChange={() => setInterfaceDensity(density.id)}
                         className="w-4 h-4 accent-[#F0FF7A]"
                       />
-                      <span className="font-medium">{density}</span>
+                      <span className="font-medium">{density.label}</span>
                     </label>
                   ))}
                 </div>

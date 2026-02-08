@@ -121,9 +121,9 @@ Real Convex-backed sections:
 
 Partially local/mock UI state:
 - `sections/SettingsView.tsx`
-  - persisted: theme, language, notifications, 2FA toggle, job title, location, timezone
+  - persisted: theme, accent color, interface density, language, notifications, 2FA toggle, job title, location, timezone
   - auth-backed/read-only: full name and email from authenticated GitHub user
-  - still local-only: appearance accent/density controls and danger-zone actions
+  - still local-only: danger-zone actions
 
 ## 7) Current Navigation Behavior
 
@@ -210,7 +210,7 @@ Convex auth tables are included via `authTables`.
 3. `SettingsView` is partially persisted:
    - preferences save to Convex via `api.users.getSettings` / `api.users.updateSettings`
    - account profile fields (job title/location/timezone) save via `api.users.getProfile` / `api.users.updateProfile`
-   - appearance accent/density and account deletion are still UI-only placeholders
+   - account deletion is still UI-only placeholder behavior
 
 ## 12) Local Development
 

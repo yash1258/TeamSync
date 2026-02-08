@@ -9,6 +9,15 @@ type NotificationPreference = {
     inApp: boolean;
 };
 
+type AccentColor =
+    | "#F0FF7A"
+    | "#60A5FA"
+    | "#A78BFA"
+    | "#F472B6"
+    | "#34D399";
+
+type InterfaceDensity = "compact" | "comfortable" | "spacious";
+
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationPreference[] = [
     { id: "task_assignments", email: true, push: true, inApp: true },
     { id: "task_due", email: true, push: false, inApp: true },
@@ -17,6 +26,9 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationPreference[] = [
     { id: "team_activity", email: false, push: false, inApp: false },
     { id: "budget_alerts", email: true, push: true, inApp: true },
 ];
+
+const DEFAULT_ACCENT_COLOR: AccentColor = "#F0FF7A";
+const DEFAULT_INTERFACE_DENSITY: InterfaceDensity = "comfortable";
 
 const normalizeNotifications = (notifications?: NotificationPreference[]) =>
     notifications?.map((notification) => ({
@@ -134,6 +146,9 @@ export const getSettings = query({
             theme: profile?.settingsTheme ?? "dark",
             language: profile?.settingsLanguage ?? "en",
             twoFactorEnabled: profile?.settingsTwoFactorEnabled ?? false,
+            accentColor: profile?.settingsAccentColor ?? DEFAULT_ACCENT_COLOR,
+            interfaceDensity:
+                profile?.settingsInterfaceDensity ?? DEFAULT_INTERFACE_DENSITY,
             notifications: normalizeNotifications(profile?.settingsNotifications),
         };
     },
@@ -145,6 +160,22 @@ export const updateSettings = mutation({
         theme: v.optional(v.union(v.literal("dark"), v.literal("light"), v.literal("system"))),
         language: v.optional(v.string()),
         twoFactorEnabled: v.optional(v.boolean()),
+        accentColor: v.optional(
+            v.union(
+                v.literal("#F0FF7A"),
+                v.literal("#60A5FA"),
+                v.literal("#A78BFA"),
+                v.literal("#F472B6"),
+                v.literal("#34D399")
+            )
+        ),
+        interfaceDensity: v.optional(
+            v.union(
+                v.literal("compact"),
+                v.literal("comfortable"),
+                v.literal("spacious")
+            )
+        ),
         notifications: v.optional(
             v.array(
                 v.object({
@@ -174,6 +205,14 @@ export const updateSettings = mutation({
                 args.twoFactorEnabled ??
                 existingProfile?.settingsTwoFactorEnabled ??
                 false,
+            settingsAccentColor:
+                args.accentColor ??
+                existingProfile?.settingsAccentColor ??
+                DEFAULT_ACCENT_COLOR,
+            settingsInterfaceDensity:
+                args.interfaceDensity ??
+                existingProfile?.settingsInterfaceDensity ??
+                DEFAULT_INTERFACE_DENSITY,
             settingsNotifications: normalizeNotifications(
                 args.notifications ?? existingProfile?.settingsNotifications
             ),

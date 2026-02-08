@@ -98,12 +98,14 @@ Tasks:
 - wire settings query/mutation in UI ✅
 - replace fake save toast behavior with real persistence ✅
 - preserve optimistic UX and show save errors ✅
-- remaining: wire account/security form fields that are still static mock inputs
+- wire account/security form fields that were static mock inputs ✅
+- remaining: appearance accent/density controls and destructive account actions are still local placeholders
 
 Acceptance criteria:
 - refresh page and settings values remain
 - save action writes to Convex successfully
 - missing settings bootstrap with defaults safely
+- account tab uses authenticated profile data (not hardcoded text)
 
 ## Phase 3: Docs Workflow Expansion (Planned)
 

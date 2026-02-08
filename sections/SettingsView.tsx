@@ -8,7 +8,6 @@ import {
   Shield,
   Palette,
   Globe,
-  Key,
   Mail,
   Smartphone,
   Check,
@@ -19,8 +18,6 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
-  Eye,
-  EyeOff,
   Lock
 } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
@@ -89,16 +86,21 @@ const initialNotifications: NotificationSetting[] = [
 
 export function SettingsView() {
   const currentUser = useQuery(api.users.currentUser);
+  const profile = useQuery(api.users.getProfile);
   const persistedSettings = useQuery(api.users.getSettings);
+  const updateProfile = useMutation(api.users.updateProfile);
   const updateSettings = useMutation(api.users.updateSettings);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
   const [notifications, setNotifications] = useState<NotificationSetting[]>(initialNotifications);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
   const [language, setLanguage] = useState('en');
+  const [jobTitle, setJobTitle] = useState('');
+  const [location, setLocation] = useState('');
+  const [timezone, setTimezone] = useState('');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
 
@@ -143,6 +145,14 @@ export function SettingsView() {
     );
   }, [persistedSettings]);
 
+  useEffect(() => {
+    if (!profile) return;
+
+    setJobTitle(profile.role ?? '');
+    setLocation(profile.location ?? '');
+    setTimezone(profile.timezone ?? '');
+  }, [profile]);
+
   const handleNotificationToggle = (id: string, channel: 'email' | 'push' | 'inApp') => {
     setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, [channel]: !n[channel] } : n)
@@ -150,23 +160,42 @@ export function SettingsView() {
   };
 
   const handleSave = async () => {
+    if (!persistedSettings || !profile) {
+      setSaveError('Settings are still loading. Please try again in a moment.');
+      return;
+    }
+
     setIsSaving(true);
+    setSaveError(null);
     try {
-      await updateSettings({
-        theme,
-        language,
-        twoFactorEnabled,
-        notifications: notifications.map((notification) => ({
-          id: notification.id,
-          email: notification.email,
-          push: notification.push,
-          inApp: notification.inApp,
-        })),
-      });
+      const saveOperations: Promise<unknown>[] = [
+        updateSettings({
+          theme,
+          language,
+          twoFactorEnabled,
+          notifications: notifications.map((notification) => ({
+            id: notification.id,
+            email: notification.email,
+            push: notification.push,
+            inApp: notification.inApp,
+          })),
+        }),
+      ];
+
+      saveOperations.push(
+        updateProfile({
+          role: jobTitle.trim() || undefined,
+          location: location.trim() || undefined,
+          timezone: timezone.trim() || undefined,
+        })
+      );
+
+      await Promise.all(saveOperations);
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
     } catch (error) {
       console.error('Failed to save settings:', error);
+      setSaveError('Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -181,6 +210,13 @@ export function SettingsView() {
 
   return (
     <div ref={sectionRef} className="space-y-6">
+      {saveError && (
+        <div className="fixed top-24 right-6 z-50 bg-red-500/90 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-slide-up">
+          <AlertTriangle className="w-5 h-5" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
       {/* Success Toast */}
       {showSaveSuccess && (
         <div className="fixed top-24 right-6 z-50 bg-green-500/90 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-slide-up">
@@ -236,15 +272,19 @@ export function SettingsView() {
                       <label className="block text-sm text-gray-400 mb-2">Full Name</label>
                       <input
                         type="text"
-                        defaultValue="Alex Chen"
-                        className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
+                        value={currentUser?.name ?? ''}
+                        readOnly
+                        className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm text-gray-300 focus:outline-none"
                       />
+                      <p className="text-xs text-gray-500 mt-1">Name comes from your GitHub account</p>
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-400 mb-2">Display Name</label>
+                      <label className="block text-sm text-gray-400 mb-2">Job Title</label>
                       <input
                         type="text"
-                        defaultValue="alex"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        placeholder="e.g. Product Lead"
                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
                       />
                     </div>
@@ -253,15 +293,18 @@ export function SettingsView() {
                     <label className="block text-sm text-gray-400 mb-2">Email Address</label>
                     <input
                       type="email"
-                      defaultValue="alex@team.com"
-                      className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
+                      value={currentUser?.email ?? ''}
+                      readOnly
+                      className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm text-gray-300 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-2">Job Title</label>
+                    <label className="block text-sm text-gray-400 mb-2">Location</label>
                     <input
                       type="text"
-                      defaultValue="Product Lead"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. San Francisco, CA"
                       className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
                     />
                   </div>
@@ -292,17 +335,13 @@ export function SettingsView() {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-400 mb-2">Timezone</label>
-                    <select
-                      defaultValue="pst"
+                    <input
+                      type="text"
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      placeholder="e.g. America/Los_Angeles"
                       className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
-                    >
-                      <option value="pst">Pacific Time (PST)</option>
-                      <option value="mst">Mountain Time (MST)</option>
-                      <option value="cst">Central Time (CST)</option>
-                      <option value="est">Eastern Time (EST)</option>
-                      <option value="gmt">Greenwich Mean Time (GMT)</option>
-                      <option value="cet">Central European Time (CET)</option>
-                    </select>
+                    />
                   </div>
                 </div>
               </div>
@@ -426,48 +465,24 @@ export function SettingsView() {
           {/* Security Settings */}
           {activeTab === 'security' && (
             <div className="space-y-6 animate-fade-in">
-              {/* Password */}
               <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl p-5">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Key className="w-5 h-5 text-[#F0FF7A]" />
-                  Change Password
+                  <Shield className="w-5 h-5 text-[#F0FF7A]" />
+                  Authentication Provider
                 </h3>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Current Password</label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Enter current password"
-                        className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors pr-10"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">New Password</label>
-                    <input
-                      type="password"
-                      placeholder="Enter new password"
-                      className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
-                    <input
-                      type="password"
-                      placeholder="Confirm new password"
-                      className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#F0FF7A] transition-colors"
-                    />
-                  </div>
-                  <button className="px-4 py-2 bg-[#F0FF7A] text-[#010101] rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all">
-                    Update Password
-                  </button>
+                  <p className="text-sm text-gray-400">
+                    TeamSync uses GitHub OAuth for sign-in. Password and primary sign-in security are managed in your GitHub account.
+                  </p>
+                  <a
+                    href="https://github.com/settings/security"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#F0FF7A] text-[#010101] rounded-lg text-sm font-medium hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all"
+                  >
+                    Open GitHub Security
+                    <ChevronRight className="w-4 h-4" />
+                  </a>
                 </div>
               </div>
 
@@ -513,27 +528,15 @@ export function SettingsView() {
                         <Monitor className="w-5 h-5 text-green-400" />
                       </div>
                       <div>
-                        <p className="font-medium">Chrome on MacOS</p>
-                        <p className="text-sm text-gray-500">Current session • San Francisco, CA</p>
+                        <p className="font-medium">Current Browser Session</p>
+                        <p className="text-sm text-gray-500">
+                          {currentUser?.email ? `Signed in as ${currentUser.email}` : 'Signed in now'}
+                        </p>
                       </div>
                     </div>
                     <span className="px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-xs font-medium">
                       Active
                     </span>
-                  </div>
-                  <div className="flex items-center justify-between p-4 bg-[#181818] rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500/10 rounded-lg">
-                        <Smartphone className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium">iPhone 15 Pro</p>
-                        <p className="text-sm text-gray-500">Last active 2 hours ago</p>
-                      </div>
-                    </div>
-                    <button className="text-sm text-red-400 hover:text-red-300">
-                      Revoke
-                    </button>
                   </div>
                 </div>
               </div>
@@ -621,7 +624,7 @@ export function SettingsView() {
           <div className="flex justify-end pt-4">
             <button
               onClick={handleSave}
-              disabled={isSaving || persistedSettings === undefined}
+              disabled={isSaving || !persistedSettings || !profile}
               className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-6 py-2.5 rounded-lg font-medium hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isSaving ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}

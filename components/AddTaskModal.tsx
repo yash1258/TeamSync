@@ -12,7 +12,12 @@ interface AddTaskModalProps {
     defaultVisibility?: 'team' | 'personal';
 }
 
-function NoTeamMembersPrompt() {
+interface MembershipRequiredPromptProps {
+    title: string;
+    description: string;
+}
+
+function MembershipRequiredPrompt({ title, description }: MembershipRequiredPromptProps) {
     const addSelf = useMutation(api.teamMembers.addCurrentUserAsTeamMember);
     const [isAdding, setIsAdding] = useState(false);
     const [added, setAdded] = useState(false);
@@ -36,7 +41,7 @@ function NoTeamMembersPrompt() {
                     <UserPlus className="w-6 h-6 text-green-400" />
                 </div>
                 <h3 className="font-semibold mb-2">You&apos;re now a team member!</h3>
-                <p className="text-sm text-gray-400 mb-4">Close and reopen this modal to create a task.</p>
+                <p className="text-sm text-gray-400 mb-4">Close and reopen this modal to create tasks.</p>
             </div>
         );
     }
@@ -46,8 +51,8 @@ function NoTeamMembersPrompt() {
             <div className="w-12 h-12 rounded-full bg-[#F0FF7A]/20 flex items-center justify-center mx-auto mb-4">
                 <Users className="w-6 h-6 text-[#F0FF7A]" />
             </div>
-            <h3 className="font-semibold mb-2">No Team Members Yet</h3>
-            <p className="text-sm text-gray-400 mb-4">You need to be a team member to create tasks.</p>
+            <h3 className="font-semibold mb-2">{title}</h3>
+            <p className="text-sm text-gray-400 mb-4">{description}</p>
             <button
                 onClick={handleAddSelf}
                 disabled={isAdding}
@@ -64,6 +69,7 @@ export function AddTaskModal({ isOpen, onClose, defaultVisibility = 'team' }: Ad
     const modalRef = useRef<HTMLDivElement>(null);
     const createTask = useMutation(api.tasks.create);
     const teamMembers = useQuery(api.teamMembers.list);
+    const currentMember = useQuery(api.teamMembers.getCurrentMember);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
@@ -108,7 +114,7 @@ export function AddTaskModal({ isOpen, onClose, defaultVisibility = 'team' }: Ad
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.title.trim() || !formData.assigneeId) return;
+        if (!formData.title.trim() || !formData.assigneeId || !currentMember?._id) return;
 
         setIsSubmitting(true);
         try {
@@ -118,7 +124,7 @@ export function AddTaskModal({ isOpen, onClose, defaultVisibility = 'team' }: Ad
                 status: 'todo',
                 priority: formData.priority,
                 visibility: formData.visibility,
-                ownerId: formData.assigneeId as Id<"teamMembers">,
+                ownerId: currentMember._id,
                 assigneeId: formData.assigneeId as Id<"teamMembers">,
                 dueDate: formData.dueDate || new Date().toISOString().split('T')[0],
                 tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
@@ -142,7 +148,10 @@ export function AddTaskModal({ isOpen, onClose, defaultVisibility = 'team' }: Ad
 
     if (!isOpen) return null;
 
-    const noTeamMembers = teamMembers && teamMembers.length === 0;
+    const isMembershipLoading = teamMembers === undefined || currentMember === undefined;
+    const noTeamMembers = teamMembers !== undefined && teamMembers.length === 0;
+    const currentUserNotMember = currentMember === null;
+    const requiresMembership = noTeamMembers || currentUserNotMember;
 
     return (
         <div
@@ -161,8 +170,15 @@ export function AddTaskModal({ isOpen, onClose, defaultVisibility = 'team' }: Ad
                     </button>
                 </div>
 
-                {noTeamMembers ? (
-                    <NoTeamMembersPrompt />
+                {isMembershipLoading ? (
+                    <div className="p-8 flex items-center justify-center">
+                        <Loader2 className="w-6 h-6 animate-spin text-[#F0FF7A]" />
+                    </div>
+                ) : requiresMembership ? (
+                    <MembershipRequiredPrompt
+                        title="Team membership required"
+                        description="Join the team with your profile before creating tasks."
+                    />
                 ) : (
                     <form onSubmit={handleSubmit} className="p-5 space-y-4">
                         <div>

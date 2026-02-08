@@ -36,16 +36,16 @@ export const listTeam = query({
     },
 });
 
-// Get personal tasks for a specific team member
+// Get personal tasks assigned to a specific team member
 export const listPersonal = query({
     args: { ownerId: v.id("teamMembers") },
     handler: async (ctx, args) => {
         const tasks = await ctx.db
             .query("tasks")
-            .withIndex("by_owner", (q) => q.eq("ownerId", args.ownerId))
+            .withIndex("by_assignee", (q) => q.eq("assigneeId", args.ownerId))
             .collect();
 
-        // Filter to only personal tasks
+        // Filter to only personal tasks.
         const personalTasks = tasks.filter((t) => t.visibility === "personal");
 
         // Populate assignee for each task

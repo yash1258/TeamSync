@@ -195,9 +195,9 @@ Convex auth tables are included via `authTables`.
 
 ## 11) Known Caveats and TODOs
 
-1. `sections/TaskBoard.tsx` currently uses a hardcoded email:
-   - `const currentUserEmail = 'alex@team.com'`
-   - This should be replaced with authenticated user email from Convex auth.
+1. Personal task filtering now depends on `api.teamMembers.getCurrentMember`:
+   - users without a team member record will not load personal tasks
+   - ensure onboarding/membership creation completes for new users
 
 2. `Dockerfile` has a temporary dependency workaround:
    - installs several packages with `npm install --no-save ...` during image build

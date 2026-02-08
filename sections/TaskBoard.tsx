@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, MoreHorizontal, Filter, Search, Calendar, Loader2, Users, User } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -35,10 +35,8 @@ export function TaskBoard() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const searchQuery = searchParams.get('q') ?? '';
 
-  // Get current user's team member ID (for personal tasks filtering)
-  // For now, we'll use email matching - in production, link auth user to team member
-  const currentUserEmail = 'alex@team.com'; // TODO: Get from auth context
-  const currentMember = useQuery(api.teamMembers.getByEmail, { email: currentUserEmail });
+  // Resolve the current authenticated team member for personal task filtering.
+  const currentMember = useQuery(api.teamMembers.getCurrentMember);
 
   // Fetch tasks based on view mode
   const teamTasks = useQuery(api.tasks.listTeam);
@@ -46,8 +44,17 @@ export function TaskBoard() {
     api.tasks.listPersonal,
     currentMember?._id ? { ownerId: currentMember._id } : 'skip'
   );
+  const canLoadPersonalTasks = !!currentMember?._id;
 
-  const tasks = viewMode === 'team' ? teamTasks : personalTasks;
+  const tasks = useMemo(
+    () => (viewMode === 'team' ? teamTasks : canLoadPersonalTasks ? personalTasks : []),
+    [viewMode, teamTasks, canLoadPersonalTasks, personalTasks]
+  );
+  const isTaskListLoading =
+    teamTasks === undefined ||
+    (viewMode === 'personal' &&
+      (currentMember === undefined ||
+        (canLoadPersonalTasks && personalTasks === undefined)));
   const updateTaskStatus = useMutation(api.tasks.updateStatus);
 
   useEffect(() => {
@@ -122,51 +129,8 @@ export function TaskBoard() {
     }
   };
 
-  // Convert Convex task to UI task format for modal
-  const convertToUITask = (task: any) => ({
-    id: task._id,
-    title: task.title,
-    description: task.description,
-    status: task.status,
-    priority: task.priority,
-    assignee: task.assignee ? {
-      id: task.assignee._id,
-      name: task.assignee.name,
-      email: task.assignee.email,
-      role: task.assignee.role,
-      avatar: task.assignee.avatar,
-      department: task.assignee.department,
-      status: task.assignee.status,
-    } : {
-      id: '',
-      name: 'Unassigned',
-      email: '',
-      role: '',
-      avatar: '',
-      department: 'engineering' as const,
-      status: 'offline' as const,
-    },
-    dueDate: task.dueDate,
-    tags: task.tags,
-    comments: (task.comments ?? []).map((c: any) => ({
-      id: c._id,
-      author: c.author ? {
-        id: c.author._id,
-        name: c.author.name,
-        email: c.author.email,
-        role: c.author.role,
-        avatar: c.author.avatar,
-        department: c.author.department,
-        status: c.author.status,
-      } : { id: '', name: 'Unknown', email: '', role: '', avatar: '', department: 'engineering' as const, status: 'offline' as const },
-      content: c.content,
-      createdAt: new Date(c.createdAt).toISOString().split('T')[0],
-    })),
-    createdAt: new Date(task.createdAt).toISOString().split('T')[0],
-  });
-
   // Loading state
-  if (tasks === undefined) {
+  if (isTaskListLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-[#F0FF7A]" />

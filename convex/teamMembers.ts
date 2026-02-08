@@ -205,9 +205,18 @@ export const getCurrentMember = query({
         const user = await ctx.db.get(userId);
         if (!user) return null;
 
+        const byUser = await ctx.db
+            .query("teamMembers")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (byUser) return byUser;
+
+        const email = user.email;
+        if (typeof email !== "string" || email.length === 0) return null;
+
         return await ctx.db
             .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
+            .withIndex("by_email", (q) => q.eq("email", email))
             .first();
     },
 });

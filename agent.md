@@ -119,8 +119,10 @@ Real Convex-backed sections:
 - `sections/ProfileView.tsx`
 - `components/Header.tsx` menu data and counts
 
-Mostly local/mock UI state:
-- `sections/SettingsView.tsx` (not wired to backend persistence yet)
+Partially local/mock UI state:
+- `sections/SettingsView.tsx`
+  - persisted: theme, language, notifications, 2FA toggle
+  - still local-only: several account/security appearance controls and placeholders
 
 ## 7) Current Navigation Behavior
 
@@ -204,7 +206,9 @@ Convex auth tables are included via `authTables`.
    - this exists because those deps are imported by UI components but are not in `package.json`/`package-lock.json`
    - long-term fix: add them to package manifests and remove workaround
 
-3. `SettingsView` is UI-only (no backend mutations yet).
+3. `SettingsView` is partially persisted:
+   - preferences save to Convex via `api.users.getSettings` / `api.users.updateSettings`
+   - several account/security controls remain UI-only placeholders
 
 ## 12) Local Development
 

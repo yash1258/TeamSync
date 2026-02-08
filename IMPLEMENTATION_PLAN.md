@@ -85,7 +85,7 @@ Tasks:
 
 ### 2.1 Persist settings data
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
 Files:
 - `convex/schema.ts`
@@ -94,10 +94,11 @@ Files:
 - `convex/_generated/*` (via regenerate, not manual edit)
 
 Tasks:
-- add backend settings shape for user preferences
-- wire settings query/mutation in UI
-- replace fake save toast behavior with real persistence
-- preserve optimistic UX and show save errors
+- add backend settings shape for user preferences ✅
+- wire settings query/mutation in UI ✅
+- replace fake save toast behavior with real persistence ✅
+- preserve optimistic UX and show save errors ✅
+- remaining: wire account/security form fields that are still static mock inputs
 
 Acceptance criteria:
 - refresh page and settings values remain

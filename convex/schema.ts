@@ -172,6 +172,21 @@ const schema = defineSchema({
         role: v.optional(v.string()),
         department: v.optional(v.string()),
         skills: v.optional(v.array(v.string())),
+        settingsTheme: v.optional(
+            v.union(v.literal("dark"), v.literal("light"), v.literal("system"))
+        ),
+        settingsLanguage: v.optional(v.string()),
+        settingsTwoFactorEnabled: v.optional(v.boolean()),
+        settingsNotifications: v.optional(
+            v.array(
+                v.object({
+                    id: v.string(),
+                    email: v.boolean(),
+                    push: v.boolean(),
+                    inApp: v.boolean(),
+                })
+            )
+        ),
     }).index("by_user", ["userId"]),
 });
 

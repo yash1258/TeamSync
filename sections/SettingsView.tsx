@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useMutation, useQuery } from 'convex/react';
 import {
   User,
   Bell,
@@ -22,6 +23,7 @@ import {
   EyeOff,
   Lock
 } from 'lucide-react';
+import { api } from '@/convex/_generated/api';
 
 type SettingsTab = 'account' | 'notifications' | 'security' | 'appearance';
 
@@ -86,11 +88,16 @@ const initialNotifications: NotificationSetting[] = [
 ];
 
 export function SettingsView() {
+  const currentUser = useQuery(api.users.currentUser);
+  const persistedSettings = useQuery(api.users.getSettings);
+  const updateSettings = useMutation(api.users.updateSettings);
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('account');
   const [notifications, setNotifications] = useState<NotificationSetting[]>(initialNotifications);
   const [theme, setTheme] = useState<'dark' | 'light' | 'system'>('dark');
   const [language, setLanguage] = useState('en');
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -114,15 +121,55 @@ export function SettingsView() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!persistedSettings) return;
+
+    setTheme(persistedSettings.theme);
+    setLanguage(persistedSettings.language);
+    setTwoFactorEnabled(persistedSettings.twoFactorEnabled);
+    setNotifications(
+      initialNotifications.map((notification) => {
+        const persisted = persistedSettings.notifications.find(
+          (item) => item.id === notification.id
+        );
+        if (!persisted) return notification;
+        return {
+          ...notification,
+          email: persisted.email,
+          push: persisted.push,
+          inApp: persisted.inApp,
+        };
+      })
+    );
+  }, [persistedSettings]);
+
   const handleNotificationToggle = (id: string, channel: 'email' | 'push' | 'inApp') => {
     setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, [channel]: !n[channel] } : n)
     );
   };
 
-  const handleSave = () => {
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateSettings({
+        theme,
+        language,
+        twoFactorEnabled,
+        notifications: notifications.map((notification) => ({
+          id: notification.id,
+          email: notification.email,
+          push: notification.push,
+          inApp: notification.inApp,
+        })),
+      });
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const tabs = [
@@ -350,7 +397,7 @@ export function SettingsView() {
                       </div>
                       <div>
                         <p className="font-medium">Email Notifications</p>
-                        <p className="text-sm text-gray-500">alex@team.com</p>
+                        <p className="text-sm text-gray-500">{currentUser?.email ?? 'No email on file'}</p>
                       </div>
                     </div>
                     <span className="px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-xs font-medium">
@@ -574,10 +621,11 @@ export function SettingsView() {
           <div className="flex justify-end pt-4">
             <button
               onClick={handleSave}
-              className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-6 py-2.5 rounded-lg font-medium hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200"
+              disabled={isSaving || persistedSettings === undefined}
+              className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-6 py-2.5 rounded-lg font-medium hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
-              Save Changes
+              {isSaving ? <CheckCircle2 className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </div>

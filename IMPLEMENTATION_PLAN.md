@@ -161,6 +161,29 @@ Targets:
 - richer activity logging
 - admin access-level management UI polish
 
+### 5.2 Team access control hardening
+
+Status: `IN PROGRESS`
+
+Files:
+- `convex/teamMembers.ts`
+- `sections/TeamView.tsx`
+- `sections/SettingsView.tsx`
+
+Tasks:
+- enforce admin-only team-member creation in backend ✅
+- prevent removing/demoting the last admin to avoid team lockout ✅
+- add admin role-management controls in Team UI ✅
+- surface access restrictions to non-admin users in Team UI ✅
+- show current team access in Settings security tab ✅
+- remaining: add invite lifecycle controls (revoke/extend) and audit history
+
+Acceptance criteria:
+- admins can change member access level from Team page
+- non-admins cannot trigger invite/access-control actions
+- backend blocks actions that would leave zero admins
+- users can see their current team access level from Settings
+
 ## Rollout Order
 
 1. Complete Phase 1 and validate.

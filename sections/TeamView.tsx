@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Users,
-  MoreHorizontal,
   Plus,
   Search,
   MessageSquare,
@@ -21,6 +20,7 @@ import {
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { InviteMemberModal } from '@/components/InviteMemberModal';
+import type { Id } from '@/convex/_generated/dataModel';
 
 const departmentIcons: Record<string, React.ElementType> = {
   engineering: Code,
@@ -44,16 +44,39 @@ const accessLevelIcons: Record<string, React.ElementType> = {
   viewer: Eye,
 };
 
+const accessLevelOptions = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'member', label: 'Member' },
+  { value: 'viewer', label: 'Viewer' },
+] as const;
+
+type AccessLevel = (typeof accessLevelOptions)[number]['value'];
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return 'Something went wrong. Please try again.';
+};
+
 export function TeamView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState<string>('all');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = useState<Id<'teamMembers'> | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<Id<'teamMembers'> | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   // Fetch team members from Convex
-  const teamMembers = useQuery(api.teamMembers.list) ?? [];
+  const rawTeamMembers = useQuery(api.teamMembers.list);
+  const teamMembers = rawTeamMembers ?? [];
   const currentMember = useQuery(api.teamMembers.getCurrentMember);
+  const updateMember = useMutation(api.teamMembers.update);
   const removeMember = useMutation(api.teamMembers.remove);
+  const isAdmin = currentMember?.accessLevel === 'admin';
+  const isViewer = currentMember?.accessLevel === 'viewer';
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -72,7 +95,13 @@ export function TeamView() {
     elements?.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [teamMembers]); // Re-run when data loads
+  }, [rawTeamMembers]); // Re-run when data loads
+
+  useEffect(() => {
+    if (!actionSuccess) return undefined;
+    const timeout = window.setTimeout(() => setActionSuccess(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [actionSuccess]);
 
   const filteredMembers = teamMembers.filter((member) => {
     const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -104,8 +133,48 @@ export function TeamView() {
     offline: teamMembers.filter(m => m.status === 'offline').length,
   };
 
+  const handleAccessLevelChange = async (
+    memberId: Id<'teamMembers'>,
+    memberName: string,
+    currentAccessLevel: AccessLevel,
+    nextAccessLevel: AccessLevel
+  ) => {
+    if (currentAccessLevel === nextAccessLevel) return;
+
+    setActionError(null);
+    setActionSuccess(null);
+    setUpdatingMemberId(memberId);
+
+    try {
+      await updateMember({ id: memberId, accessLevel: nextAccessLevel });
+      setActionSuccess(`${memberName} is now ${nextAccessLevel}.`);
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: Id<'teamMembers'>, memberName: string) => {
+    const confirmed = confirm(`Remove ${memberName} from the team?`);
+    if (!confirmed) return;
+
+    setActionError(null);
+    setActionSuccess(null);
+    setRemovingMemberId(memberId);
+
+    try {
+      await removeMember({ id: memberId });
+      setActionSuccess(`${memberName} was removed from the team.`);
+    } catch (error) {
+      setActionError(getErrorMessage(error));
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
   // Loading state
-  if (teamMembers === undefined) {
+  if (rawTeamMembers === undefined) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-[#F0FF7A]" />
@@ -115,6 +184,17 @@ export function TeamView() {
 
   return (
     <div ref={sectionRef} className="space-y-6">
+      {actionError && (
+        <div className="fixed top-24 right-6 z-50 bg-red-500/90 text-white px-4 py-3 rounded-lg shadow-lg animate-fade-slide-up">
+          {actionError}
+        </div>
+      )}
+      {actionSuccess && (
+        <div className="fixed top-24 right-6 z-50 bg-green-500/90 text-white px-4 py-3 rounded-lg shadow-lg animate-fade-slide-up">
+          {actionSuccess}
+        </div>
+      )}
+
       {/* Header */}
       <div className="animate-on-scroll opacity-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -149,12 +229,28 @@ export function TeamView() {
 
           <button
             onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-4 py-2 rounded-lg font-medium text-sm hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200"
+            disabled={!isAdmin}
+            title={!isAdmin ? 'Only admins can invite members' : undefined}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 ${
+              isAdmin
+                ? 'bg-[#F0FF7A] text-[#010101] hover:shadow-lg hover:shadow-[#F0FF7A]/20'
+                : 'bg-[#181818] text-gray-500 cursor-not-allowed border border-[#232323]'
+            }`}
           >
             <Plus className="w-4 h-4" />
             <span>Invite</span>
           </button>
         </div>
+      </div>
+
+      <div className="animate-on-scroll opacity-0 bg-[#0B0B0B] border border-[#232323] rounded-xl p-4">
+        <p className="text-sm text-gray-300">
+          {isAdmin
+            ? 'Admin access: you can invite members, manage access levels, and remove members.'
+            : isViewer
+              ? 'Viewer access: you have read-only access. Admins can grant additional permissions.'
+              : 'Member access: you can collaborate, but only admins can manage invites and access levels.'}
+        </p>
       </div>
 
       {/* Stats */}
@@ -205,22 +301,18 @@ export function TeamView() {
                   />
                   <span className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-[#0B0B0B] ${getStatusColor(member.status)}`} />
                 </div>
-                {currentMember?.accessLevel === 'admin' && member._id !== currentMember._id && (
+                {isAdmin && member._id !== currentMember?._id && (
                   <button
-                    className="p-1.5 rounded-lg hover:bg-[#181818] text-gray-500 opacity-0 group-hover:opacity-100 transition-all hover:text-red-400"
+                    className="p-1.5 rounded-lg hover:bg-[#181818] text-gray-500 opacity-0 group-hover:opacity-100 transition-all hover:text-red-400 disabled:opacity-60 disabled:cursor-wait"
                     title="Remove member"
-                    onClick={async () => {
-                      if (confirm(`Are you sure you want to remove ${member.name}?`)) {
-                        try {
-                          await removeMember({ id: member._id });
-                        } catch (error) {
-                          console.error('Failed to remove member:', error);
-                          alert('Failed to remove member. Check console for details.');
-                        }
-                      }
-                    }}
+                    onClick={() => void handleRemoveMember(member._id, member.name)}
+                    disabled={removingMemberId === member._id || updatingMemberId === member._id}
                   >
-                    <X className="w-4 h-4" />
+                    {removingMemberId === member._id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
                   </button>
                 )}
               </div>
@@ -238,6 +330,29 @@ export function TeamView() {
                 )}
               </div>
               <p className="text-sm text-gray-400 mb-3">{member.role}</p>
+
+              {isAdmin && member._id !== currentMember?._id && (
+                <div className="mb-3">
+                  <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+                    Access Level
+                  </label>
+                  <select
+                    value={member.accessLevel}
+                    onChange={(e) => {
+                      const nextValue = e.target.value as AccessLevel;
+                      void handleAccessLevelChange(member._id, member.name, member.accessLevel, nextValue);
+                    }}
+                    disabled={updatingMemberId === member._id || removingMemberId === member._id}
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F0FF7A] transition-colors disabled:opacity-60"
+                  >
+                    {accessLevelOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 mb-4 min-h-[56px] content-start">
                 <div className="flex items-center gap-2 w-full">
@@ -276,6 +391,10 @@ export function TeamView() {
                   <span className="hidden sm:inline">Call</span>
                 </button>
               </div>
+
+              {member._id === currentMember?._id && (
+                <p className="text-[11px] text-gray-500 mt-3">This is your account.</p>
+              )}
             </div>
           );
         })}

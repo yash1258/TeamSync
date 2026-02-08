@@ -96,6 +96,7 @@ const densityOptions: { id: InterfaceDensity; label: string }[] = [
 
 export function SettingsView() {
   const currentUser = useQuery(api.users.currentUser);
+  const currentMember = useQuery(api.teamMembers.getCurrentMember);
   const profile = useQuery(api.users.getProfile);
   const persistedSettings = useQuery(api.users.getSettings);
   const updateProfile = useMutation(api.users.updateProfile);
@@ -223,6 +224,10 @@ export function SettingsView() {
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'appearance', label: 'Appearance', icon: Palette },
   ];
+
+  const accessLabel = currentMember?.accessLevel
+    ? `${currentMember.accessLevel.charAt(0).toUpperCase()}${currentMember.accessLevel.slice(1)}`
+    : 'Not in team';
 
   return (
     <div ref={sectionRef} className="space-y-6">
@@ -532,6 +537,20 @@ export function SettingsView() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl p-5">
+                <h3 className="font-semibold mb-4 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-[#F0FF7A]" />
+                  Team Access
+                </h3>
+                <div className="p-4 bg-[#181818] rounded-lg">
+                  <p className="text-sm text-gray-400 mb-2">Current access level</p>
+                  <p className="font-medium">{accessLabel}</p>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Access is managed by team admins in the Team page.
+                  </p>
+                </div>
               </div>
 
               {/* Active Sessions */}

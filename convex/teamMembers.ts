@@ -1,6 +1,48 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
+
+const resolveMemberByUser = async (
+    ctx: MutationCtx | QueryCtx,
+    userId: Id<"users">
+) => {
+    const byUser = await ctx.db
+        .query("teamMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    if (byUser) return byUser;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const email = user.email;
+    if (typeof email !== "string" || email.length === 0) return null;
+
+    return await ctx.db
+        .query("teamMembers")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+};
+
+const requireCurrentMember = async (ctx: MutationCtx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const currentMember = await resolveMemberByUser(ctx, userId);
+    if (!currentMember) throw new Error("Team membership required");
+
+    return { userId, currentMember };
+};
+
+const countOtherAdmins = async (ctx: MutationCtx, memberId: Id<"teamMembers">) => {
+    const adminMembers = await ctx.db
+        .query("teamMembers")
+        .filter((q) => q.eq(q.field("accessLevel"), "admin"))
+        .collect();
+
+    return adminMembers.filter((member) => member._id !== memberId).length;
+};
 
 // Get all team members
 export const list = query({
@@ -53,10 +95,7 @@ export const addCurrentUserAsTeamMember = mutation({
         }
 
         // Check if already a team member
-        const existing = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
-            .first();
+        const existing = await resolveMemberByUser(ctx, userId);
 
         if (existing) {
             return existing._id;
@@ -97,6 +136,11 @@ export const create = mutation({
         accessLevel: v.optional(v.union(v.literal("admin"), v.literal("member"), v.literal("viewer"))),
     },
     handler: async (ctx, args) => {
+        const { currentMember } = await requireCurrentMember(ctx);
+        if (currentMember.accessLevel !== "admin") {
+            throw new Error("Only admins can create team members");
+        }
+
         return await ctx.db.insert("teamMembers", {
             ...args,
             accessLevel: args.accessLevel ?? "member",
@@ -131,16 +175,7 @@ export const update = mutation({
         accessLevel: v.optional(v.union(v.literal("admin"), v.literal("member"), v.literal("viewer"))),
     },
     handler: async (ctx, args) => {
-        const userId = await auth.getUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
-        const user = await ctx.db.get(userId);
-        if (!user) throw new Error("User not found");
-
-        const currentMember = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
-            .first();
+        const { currentMember } = await requireCurrentMember(ctx);
 
         const targetMember = await ctx.db.get(args.id);
         if (!targetMember) throw new Error("Member not found");
@@ -157,6 +192,16 @@ export const update = mutation({
         if (args.accessLevel && !isAdmin) {
             throw new Error("Only admin can change access level");
         }
+        if (
+            args.accessLevel &&
+            targetMember.accessLevel === "admin" &&
+            args.accessLevel !== "admin"
+        ) {
+            const otherAdminCount = await countOtherAdmins(ctx, targetMember._id);
+            if (otherAdminCount === 0) {
+                throw new Error("Cannot remove the last admin.");
+            }
+        }
 
         const { id, ...updates } = args;
         const cleanUpdates = Object.fromEntries(
@@ -171,16 +216,7 @@ export const update = mutation({
 export const remove = mutation({
     args: { id: v.id("teamMembers") },
     handler: async (ctx, args) => {
-        const userId = await auth.getUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
-        const user = await ctx.db.get(userId);
-        if (!user) throw new Error("User not found");
-
-        const currentMember = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", user.email ?? ""))
-            .first();
+        const { currentMember } = await requireCurrentMember(ctx);
 
         if (!currentMember || currentMember.accessLevel !== "admin") {
             throw new Error("Only admins can remove members");
@@ -189,6 +225,16 @@ export const remove = mutation({
         // Don't allow removing yourself
         if (currentMember._id === args.id) {
             throw new Error("Cannot remove yourself");
+        }
+
+        const targetMember = await ctx.db.get(args.id);
+        if (!targetMember) throw new Error("Member not found");
+
+        if (targetMember.accessLevel === "admin") {
+            const otherAdminCount = await countOtherAdmins(ctx, targetMember._id);
+            if (otherAdminCount === 0) {
+                throw new Error("Cannot remove the last admin.");
+            }
         }
 
         await ctx.db.delete(args.id);
@@ -201,22 +247,6 @@ export const getCurrentMember = query({
     handler: async (ctx) => {
         const userId = await auth.getUserId(ctx);
         if (!userId) return null;
-
-        const user = await ctx.db.get(userId);
-        if (!user) return null;
-
-        const byUser = await ctx.db
-            .query("teamMembers")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .first();
-        if (byUser) return byUser;
-
-        const email = user.email;
-        if (typeof email !== "string" || email.length === 0) return null;
-
-        return await ctx.db
-            .query("teamMembers")
-            .withIndex("by_email", (q) => q.eq("email", email))
-            .first();
+        return await resolveMemberByUser(ctx, userId);
     },
 });

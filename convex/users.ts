@@ -17,6 +17,16 @@ type AccentColor =
     | "#34D399";
 
 type InterfaceDensity = "compact" | "comfortable" | "spacious";
+type TaskPriorityFilter = "all" | "low" | "medium" | "high";
+type TaskViewMode = "team" | "personal";
+type TaskSavedView = {
+    id: string;
+    label: string;
+    query?: string;
+    priority: TaskPriorityFilter;
+    viewMode: TaskViewMode;
+    createdAt: number;
+};
 
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationPreference[] = [
     { id: "task_assignments", email: true, push: true, inApp: true },
@@ -37,6 +47,16 @@ const normalizeNotifications = (notifications?: NotificationPreference[]) =>
         push: notification.push,
         inApp: notification.inApp,
     })) ?? DEFAULT_NOTIFICATION_SETTINGS;
+
+const normalizeTaskViews = (views?: TaskSavedView[]) =>
+    views?.map((view) => ({
+        id: view.id,
+        label: view.label,
+        query: view.query,
+        priority: view.priority,
+        viewMode: view.viewMode,
+        createdAt: view.createdAt,
+    })) ?? [];
 
 // Get current authenticated user
 export const currentUser = query({
@@ -151,6 +171,108 @@ export const getSettings = query({
                 profile?.settingsInterfaceDensity ?? DEFAULT_INTERFACE_DENSITY,
             notifications: normalizeNotifications(profile?.settingsNotifications),
         };
+    },
+});
+
+// Get task board saved views for the current user.
+export const getTaskViews = query({
+    args: {},
+    handler: async (ctx) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) return [];
+
+        const profile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+
+        return normalizeTaskViews(profile?.taskSavedViews).sort(
+            (a, b) => b.createdAt - a.createdAt
+        );
+    },
+});
+
+// Save the current task board view for quick reuse.
+export const saveTaskView = mutation({
+    args: {
+        label: v.string(),
+        query: v.optional(v.string()),
+        priority: v.union(
+            v.literal("all"),
+            v.literal("low"),
+            v.literal("medium"),
+            v.literal("high")
+        ),
+        viewMode: v.union(v.literal("team"), v.literal("personal")),
+    },
+    handler: async (ctx, args) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) {
+            throw new Error("Not authenticated");
+        }
+
+        const label = args.label.trim();
+        if (!label) {
+            throw new Error("View name is required.");
+        }
+
+        const profile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+
+        const existingViews = normalizeTaskViews(profile?.taskSavedViews);
+        const now = Date.now();
+        const newView: TaskSavedView = {
+            id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+            label,
+            query: args.query?.trim() || undefined,
+            priority: args.priority,
+            viewMode: args.viewMode,
+            createdAt: now,
+        };
+
+        const deduplicatedViews = existingViews.filter(
+            (view) => view.label.toLowerCase() !== label.toLowerCase()
+        );
+        const nextViews = [newView, ...deduplicatedViews].slice(0, 8);
+
+        if (profile) {
+            await ctx.db.patch(profile._id, { taskSavedViews: nextViews });
+            return newView;
+        }
+
+        await ctx.db.insert("userProfiles", {
+            userId,
+            taskSavedViews: nextViews,
+        });
+
+        return newView;
+    },
+});
+
+// Delete a saved task board view.
+export const deleteTaskView = mutation({
+    args: {
+        id: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const userId = await auth.getUserId(ctx);
+        if (!userId) {
+            throw new Error("Not authenticated");
+        }
+
+        const profile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (!profile) return [];
+
+        const nextViews = normalizeTaskViews(profile.taskSavedViews).filter(
+            (view) => view.id !== args.id
+        );
+        await ctx.db.patch(profile._id, { taskSavedViews: nextViews });
+        return nextViews;
     },
 });
 

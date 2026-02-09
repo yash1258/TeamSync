@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, MoreHorizontal, Filter, Search, Calendar, Loader2, Users, User } from 'lucide-react';
+import { Plus, MoreHorizontal, Search, Calendar, Loader2, Users, User, BookmarkPlus, X } from 'lucide-react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
@@ -10,6 +10,16 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { Id } from '@/convex/_generated/dataModel';
 
 type ColumnStatus = 'todo' | 'in-progress' | 'review' | 'done';
+type TaskPriorityFilter = 'all' | 'low' | 'medium' | 'high';
+
+interface SavedTaskView {
+  id: string;
+  label: string;
+  query?: string;
+  priority: TaskPriorityFilter;
+  viewMode: 'team' | 'personal';
+  createdAt: number;
+}
 
 interface Column {
   id: ColumnStatus;
@@ -29,9 +39,12 @@ export function TaskBoard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterPriority, setFilterPriority] = useState<TaskPriorityFilter>('all');
   const [viewMode, setViewMode] = useState<'team' | 'personal'>('team');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isSavingView, setIsSavingView] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
+  const [viewFeedback, setViewFeedback] = useState<string | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const searchQuery = searchParams.get('q') ?? '';
 
@@ -44,6 +57,10 @@ export function TaskBoard() {
     api.tasks.listPersonal,
     currentMember?._id ? { ownerId: currentMember._id } : 'skip'
   );
+  const rawSavedViews = useQuery(api.users.getTaskViews);
+  const saveTaskView = useMutation(api.users.saveTaskView);
+  const deleteTaskView = useMutation(api.users.deleteTaskView);
+  const savedViews = useMemo(() => (rawSavedViews ?? []) as SavedTaskView[], [rawSavedViews]);
   const canLoadPersonalTasks = !!currentMember?._id;
 
   const tasks = useMemo(
@@ -76,6 +93,12 @@ export function TaskBoard() {
     return () => observer.disconnect();
   }, [tasks]);
 
+  useEffect(() => {
+    if (!viewFeedback) return undefined;
+    const timeout = window.setTimeout(() => setViewFeedback(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [viewFeedback]);
+
   const handleSearchChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value.trim()) {
@@ -85,6 +108,48 @@ export function TaskBoard() {
     }
     const queryString = params.toString();
     router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+  };
+
+  const handleSaveView = async () => {
+    const suggestedName = `${viewMode === 'team' ? 'Team' : 'My'} ${filterPriority === 'all' ? 'Tasks' : `${filterPriority} Priority`} View`;
+    const label = prompt('Name this saved view:', suggestedName);
+    if (!label) return;
+
+    setViewError(null);
+    setViewFeedback(null);
+    setIsSavingView(true);
+    try {
+      await saveTaskView({
+        label,
+        query: searchQuery.trim() || undefined,
+        priority: filterPriority,
+        viewMode,
+      });
+      setViewFeedback(`Saved view "${label.trim()}"`);
+    } catch (error) {
+      console.error('Failed to save view:', error);
+      setViewError(error instanceof Error ? error.message : 'Failed to save view.');
+    } finally {
+      setIsSavingView(false);
+    }
+  };
+
+  const applySavedView = (view: SavedTaskView) => {
+    setViewMode(view.viewMode);
+    setFilterPriority(view.priority);
+    handleSearchChange(view.query ?? '');
+  };
+
+  const handleDeleteSavedView = async (view: SavedTaskView) => {
+    setViewError(null);
+    setViewFeedback(null);
+    try {
+      await deleteTaskView({ id: view.id });
+      setViewFeedback(`Deleted "${view.label}"`);
+    } catch (error) {
+      console.error('Failed to delete saved view:', error);
+      setViewError(error instanceof Error ? error.message : 'Failed to delete view.');
+    }
   };
 
   const filteredTasks = (tasks ?? []).filter((task) => {
@@ -140,6 +205,17 @@ export function TaskBoard() {
 
   return (
     <div ref={sectionRef} className="space-y-6">
+      {viewError && (
+        <div className="fixed top-24 right-6 z-50 bg-red-500/90 text-white px-4 py-3 rounded-lg shadow-lg animate-fade-slide-up">
+          {viewError}
+        </div>
+      )}
+      {viewFeedback && (
+        <div className="fixed top-24 right-6 z-50 bg-green-500/90 text-white px-4 py-3 rounded-lg shadow-lg animate-fade-slide-up">
+          {viewFeedback}
+        </div>
+      )}
+
       {/* Header */}
       <div className="animate-on-scroll opacity-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -181,7 +257,7 @@ export function TaskBoard() {
 
           <select
             value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
+            onChange={(e) => setFilterPriority(e.target.value as TaskPriorityFilter)}
             className="bg-[#181818] border border-[#232323] rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-[#F0FF7A] transition-colors"
           >
             <option value="all">All Priorities</option>
@@ -190,9 +266,13 @@ export function TaskBoard() {
             <option value="low">Low</option>
           </select>
 
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#181818] border border-[#232323] rounded-lg text-sm hover:border-[#333] transition-colors">
-            <Filter className="w-4 h-4" />
-            <span>Filter</span>
+          <button
+            onClick={() => void handleSaveView()}
+            disabled={isSavingView}
+            className="flex items-center gap-2 px-4 py-2 bg-[#181818] border border-[#232323] rounded-lg text-sm hover:border-[#333] transition-colors disabled:opacity-60"
+          >
+            {isSavingView ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookmarkPlus className="w-4 h-4" />}
+            <span>Save View</span>
           </button>
 
           <button
@@ -204,6 +284,43 @@ export function TaskBoard() {
           </button>
         </div>
       </div>
+
+      {savedViews.length > 0 && (
+        <div className="animate-on-scroll opacity-0 bg-[#0B0B0B] border border-[#232323] rounded-xl p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Saved Views</p>
+          <div className="flex flex-wrap gap-2">
+            {savedViews.map((view) => {
+              const isActive =
+                view.viewMode === viewMode &&
+                view.priority === filterPriority &&
+                (view.query ?? '') === searchQuery;
+
+              return (
+                <div key={view.id} className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
+                  isActive
+                    ? 'border-[#F0FF7A] bg-[#F0FF7A]/10 text-[#F0FF7A]'
+                    : 'border-[#232323] bg-[#111111] text-gray-300'
+                }`}>
+                  <button
+                    onClick={() => applySavedView(view)}
+                    className="hover:underline"
+                    title={`${view.viewMode} • ${view.priority}${view.query ? ` • ${view.query}` : ''}`}
+                  >
+                    {view.label}
+                  </button>
+                  <button
+                    onClick={() => void handleDeleteSavedView(view)}
+                    className="p-0.5 rounded hover:bg-[#181818]"
+                    title={`Delete ${view.label}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Kanban Board */}
       <div className="animate-on-scroll opacity-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -226,6 +226,27 @@ Acceptance criteria:
 - unauthorized users cannot mutate task records
 - dashboard team activity reflects task creation/status/comment/update/delete events
 
+### 5.5 Saved task views
+
+Status: `IN PROGRESS`
+
+Files:
+- `convex/schema.ts`
+- `convex/users.ts`
+- `sections/TaskBoard.tsx`
+
+Tasks:
+- add persisted `taskSavedViews` profile shape in schema ✅
+- add user APIs to list/save/delete task board views ✅
+- allow saving current board filters/search/view mode from UI ✅
+- allow one-click applying and deleting saved views ✅
+- remaining: shareable team-level views and pin-to-sidebar support
+
+Acceptance criteria:
+- users can save current task board state (mode + search + priority)
+- saved views survive refresh/login via Convex persistence
+- users can apply or remove saved views without page reload
+
 ## Rollout Order
 
 1. Complete Phase 1 and validate.

@@ -203,6 +203,23 @@ const schema = defineSchema({
                 })
             )
         ),
+        taskSavedViews: v.optional(
+            v.array(
+                v.object({
+                    id: v.string(),
+                    label: v.string(),
+                    query: v.optional(v.string()),
+                    priority: v.union(
+                        v.literal("all"),
+                        v.literal("low"),
+                        v.literal("medium"),
+                        v.literal("high")
+                    ),
+                    viewMode: v.union(v.literal("team"), v.literal("personal")),
+                    createdAt: v.number(),
+                })
+            )
+        ),
     }).index("by_user", ["userId"]),
 });
 

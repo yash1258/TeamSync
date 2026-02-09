@@ -205,6 +205,27 @@ Acceptance criteria:
 - invite modal shows active invites separately from used/expired history
 - non-admins cannot manage invite lifecycle actions
 
+### 5.4 Task comments and activity feed integration
+
+Status: `IN PROGRESS`
+
+Files:
+- `convex/tasks.ts`
+- `components/TaskModal.tsx`
+
+Tasks:
+- enforce task mutation auth checks based on current team membership ✅
+- stop trusting client-supplied comment author identity ✅
+- add task comment composer in task modal ✅
+- write task actions/comments into `activityLog` for dashboard feed ✅
+- remaining: expose richer activity context/filtering in dashboard UI
+
+Acceptance criteria:
+- authenticated team members can add comments directly from task modal
+- comment author is always derived from authenticated member, not client args
+- unauthorized users cannot mutate task records
+- dashboard team activity reflects task creation/status/comment/update/delete events
+
 ## Rollout Order
 
 1. Complete Phase 1 and validate.

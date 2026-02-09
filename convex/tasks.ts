@@ -1,38 +1,110 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
+import { auth } from "./auth";
+
+type RequestContext = MutationCtx | QueryCtx;
+type TaskStatus = "todo" | "in-progress" | "review" | "done";
+
+const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+    todo: "To Do",
+    "in-progress": "In Progress",
+    review: "Review",
+    done: "Done",
+};
+
+const resolveCurrentMember = async (ctx: RequestContext) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) return null;
+
+    const byUser = await ctx.db
+        .query("teamMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+    if (byUser) return byUser;
+
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+
+    const email = user.email;
+    if (typeof email !== "string" || email.length === 0) return null;
+
+    return await ctx.db
+        .query("teamMembers")
+        .withIndex("by_email", (q) => q.eq("email", email))
+        .first();
+};
+
+const requireCurrentMember = async (ctx: MutationCtx) => {
+    const member = await resolveCurrentMember(ctx);
+    if (!member) {
+        throw new Error("You must join the team before modifying tasks.");
+    }
+    return member;
+};
+
+const canAccessTask = (member: Doc<"teamMembers">, task: Doc<"tasks">) => {
+    if (task.visibility === "team") return true;
+    if (member.accessLevel === "admin") return true;
+    return task.ownerId === member._id || task.assigneeId === member._id;
+};
+
+const canUpdateTask = (member: Doc<"teamMembers">, task: Doc<"tasks">) => {
+    if (task.visibility === "team") return true;
+    if (member.accessLevel === "admin") return true;
+    return task.ownerId === member._id || task.assigneeId === member._id;
+};
+
+const canDeleteTask = (member: Doc<"teamMembers">, task: Doc<"tasks">) =>
+    member.accessLevel === "admin" || task.ownerId === member._id;
+
+const logTaskActivity = async (
+    ctx: MutationCtx,
+    memberId: Id<"teamMembers">,
+    action: string,
+    task: Doc<"tasks">
+) => {
+    if (task.visibility !== "team") return;
+    await ctx.db.insert("activityLog", {
+        userId: memberId,
+        action,
+        target: task.title,
+        createdAt: Date.now(),
+    });
+};
+
+const hydrateTask = async (ctx: RequestContext, task: Doc<"tasks">) => {
+    const assignee = await ctx.db.get(task.assigneeId);
+    const owner = await ctx.db.get(task.ownerId);
+    const comments = await ctx.db
+        .query("comments")
+        .withIndex("by_task", (q) => q.eq("taskId", task._id))
+        .collect();
+
+    const sortedComments = comments.sort((a, b) => a.createdAt - b.createdAt);
+    const commentsWithAuthors = await Promise.all(
+        sortedComments.map(async (comment) => {
+            const author = await ctx.db.get(comment.authorId);
+            return { ...comment, author };
+        })
+    );
+
+    return { ...task, assignee, owner, comments: commentsWithAuthors };
+};
 
 // Get all team-visible tasks with assignee populated
 export const listTeam = query({
     args: {},
     handler: async (ctx) => {
+        const member = await resolveCurrentMember(ctx);
+        if (!member) return [];
+
         const tasks = await ctx.db
             .query("tasks")
             .withIndex("by_visibility", (q) => q.eq("visibility", "team"))
             .collect();
 
-        // Populate assignee and owner for each task
-        const tasksWithDetails = await Promise.all(
-            tasks.map(async (task) => {
-                const assignee = await ctx.db.get(task.assigneeId);
-                const owner = await ctx.db.get(task.ownerId);
-                const comments = await ctx.db
-                    .query("comments")
-                    .withIndex("by_task", (q) => q.eq("taskId", task._id))
-                    .collect();
-
-                // Populate comment authors
-                const commentsWithAuthors = await Promise.all(
-                    comments.map(async (comment) => {
-                        const author = await ctx.db.get(comment.authorId);
-                        return { ...comment, author };
-                    })
-                );
-
-                return { ...task, assignee, owner, comments: commentsWithAuthors };
-            })
-        );
-
-        return tasksWithDetails;
+        return await Promise.all(tasks.map((task) => hydrateTask(ctx, task)));
     },
 });
 
@@ -40,35 +112,17 @@ export const listTeam = query({
 export const listPersonal = query({
     args: { ownerId: v.id("teamMembers") },
     handler: async (ctx, args) => {
+        const member = await resolveCurrentMember(ctx);
+        if (!member) return [];
+        if (member.accessLevel !== "admin" && member._id !== args.ownerId) return [];
+
         const tasks = await ctx.db
             .query("tasks")
             .withIndex("by_assignee", (q) => q.eq("assigneeId", args.ownerId))
             .collect();
 
-        // Filter to only personal tasks.
-        const personalTasks = tasks.filter((t) => t.visibility === "personal");
-
-        // Populate assignee for each task
-        const tasksWithDetails = await Promise.all(
-            personalTasks.map(async (task) => {
-                const assignee = await ctx.db.get(task.assigneeId);
-                const comments = await ctx.db
-                    .query("comments")
-                    .withIndex("by_task", (q) => q.eq("taskId", task._id))
-                    .collect();
-
-                const commentsWithAuthors = await Promise.all(
-                    comments.map(async (comment) => {
-                        const author = await ctx.db.get(comment.authorId);
-                        return { ...comment, author };
-                    })
-                );
-
-                return { ...task, assignee, comments: commentsWithAuthors };
-            })
-        );
-
-        return tasksWithDetails;
+        const personalTasks = tasks.filter((task) => task.visibility === "personal");
+        return await Promise.all(personalTasks.map((task) => hydrateTask(ctx, task)));
     },
 });
 
@@ -76,20 +130,21 @@ export const listPersonal = query({
 export const listRecent = query({
     args: { limit: v.optional(v.number()) },
     handler: async (ctx, args) => {
+        const member = await resolveCurrentMember(ctx);
+        if (!member) return [];
+
         const tasks = await ctx.db
             .query("tasks")
             .withIndex("by_visibility", (q) => q.eq("visibility", "team"))
             .order("desc")
             .take(args.limit ?? 4);
 
-        const tasksWithAssignees = await Promise.all(
+        return await Promise.all(
             tasks.map(async (task) => {
                 const assignee = await ctx.db.get(task.assigneeId);
                 return { ...task, assignee };
             })
         );
-
-        return tasksWithAssignees;
     },
 });
 
@@ -112,10 +167,22 @@ export const create = mutation({
         tags: v.array(v.string()),
     },
     handler: async (ctx, args) => {
-        return await ctx.db.insert("tasks", {
+        const member = await requireCurrentMember(ctx);
+        if (args.ownerId !== member._id) {
+            throw new Error("Task owner must be the current member.");
+        }
+
+        const taskId = await ctx.db.insert("tasks", {
             ...args,
             createdAt: Date.now(),
         });
+
+        const task = await ctx.db.get(taskId);
+        if (task) {
+            await logTaskActivity(ctx, member._id, "created task", task);
+        }
+
+        return taskId;
     },
 });
 
@@ -131,7 +198,24 @@ export const updateStatus = mutation({
         ),
     },
     handler: async (ctx, args) => {
-        return await ctx.db.patch(args.id, { status: args.status });
+        const member = await requireCurrentMember(ctx);
+        const task = await ctx.db.get(args.id);
+        if (!task) throw new Error("Task not found");
+        if (!canUpdateTask(member, task)) throw new Error("Not authorized");
+
+        const previousStatus = task.status;
+        await ctx.db.patch(args.id, { status: args.status });
+
+        if (previousStatus !== args.status) {
+            await logTaskActivity(
+                ctx,
+                member._id,
+                `moved task to ${TASK_STATUS_LABELS[args.status]}`,
+                task
+            );
+        }
+
+        return args.id;
     },
 });
 
@@ -139,16 +223,26 @@ export const updateStatus = mutation({
 export const addComment = mutation({
     args: {
         taskId: v.id("tasks"),
-        authorId: v.id("teamMembers"),
         content: v.string(),
     },
     handler: async (ctx, args) => {
-        return await ctx.db.insert("comments", {
+        const member = await requireCurrentMember(ctx);
+        const task = await ctx.db.get(args.taskId);
+        if (!task) throw new Error("Task not found");
+        if (!canAccessTask(member, task)) throw new Error("Not authorized");
+
+        const content = args.content.trim();
+        if (!content) throw new Error("Comment cannot be empty.");
+
+        const commentId = await ctx.db.insert("comments", {
             taskId: args.taskId,
-            authorId: args.authorId,
-            content: args.content,
+            authorId: member._id,
+            content,
             createdAt: Date.now(),
         });
+
+        await logTaskActivity(ctx, member._id, "commented on", task);
+        return commentId;
     },
 });
 
@@ -171,12 +265,23 @@ export const update = mutation({
         tags: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
+        const member = await requireCurrentMember(ctx);
+        const task = await ctx.db.get(args.id);
+        if (!task) throw new Error("Task not found");
+        if (!canUpdateTask(member, task)) throw new Error("Not authorized");
+
         const { id, ...updates } = args;
-        // Filter out undefined values
         const cleanUpdates = Object.fromEntries(
-            Object.entries(updates).filter(([, v]) => v !== undefined)
-        );
-        return await ctx.db.patch(id, cleanUpdates);
+            Object.entries(updates).filter(([, value]) => value !== undefined)
+        ) as Partial<Doc<"tasks">>;
+
+        if (Object.keys(cleanUpdates).length === 0) {
+            return id;
+        }
+
+        await ctx.db.patch(id, cleanUpdates);
+        await logTaskActivity(ctx, member._id, "updated task", task);
+        return id;
     },
 });
 
@@ -184,7 +289,11 @@ export const update = mutation({
 export const remove = mutation({
     args: { id: v.id("tasks") },
     handler: async (ctx, args) => {
-        // Delete all comments for this task
+        const member = await requireCurrentMember(ctx);
+        const task = await ctx.db.get(args.id);
+        if (!task) throw new Error("Task not found");
+        if (!canDeleteTask(member, task)) throw new Error("Only admins or task owners can delete tasks.");
+
         const comments = await ctx.db
             .query("comments")
             .withIndex("by_task", (q) => q.eq("taskId", args.id))
@@ -194,8 +303,8 @@ export const remove = mutation({
             await ctx.db.delete(comment._id);
         }
 
-        // Delete the task
         await ctx.db.delete(args.id);
+        await logTaskActivity(ctx, member._id, "deleted task", task);
     },
 });
 
@@ -203,23 +312,13 @@ export const remove = mutation({
 export const getById = query({
     args: { id: v.id("tasks") },
     handler: async (ctx, args) => {
+        const member = await resolveCurrentMember(ctx);
+        if (!member) return null;
+
         const task = await ctx.db.get(args.id);
         if (!task) return null;
+        if (!canAccessTask(member, task)) return null;
 
-        const assignee = await ctx.db.get(task.assigneeId);
-        const owner = await ctx.db.get(task.ownerId);
-        const comments = await ctx.db
-            .query("comments")
-            .withIndex("by_task", (q) => q.eq("taskId", task._id))
-            .collect();
-
-        const commentsWithAuthors = await Promise.all(
-            comments.map(async (comment) => {
-                const author = await ctx.db.get(comment.authorId);
-                return { ...comment, author };
-            })
-        );
-
-        return { ...task, assignee, owner, comments: commentsWithAuthors };
+        return await hydrateTask(ctx, task);
     },
 });

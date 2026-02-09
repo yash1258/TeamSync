@@ -7,27 +7,48 @@ import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
 interface TaskModalProps {
-    taskId: Id<"tasks">;
+    taskId: Id<'tasks'>;
     onClose: () => void;
     onDeleted?: () => void;
+}
+
+type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
+type TaskPriority = 'low' | 'medium' | 'high';
+
+interface CommentAuthor {
+    name?: string;
+    avatar?: string;
+}
+
+interface TaskComment {
+    _id: Id<'comments'>;
+    content: string;
+    createdAt: number;
+    author?: CommentAuthor | null;
 }
 
 export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
     const modalRef = useRef<HTMLDivElement>(null);
     const task = useQuery(api.tasks.getById, { id: taskId });
+    const currentMember = useQuery(api.teamMembers.getCurrentMember);
     const updateTask = useMutation(api.tasks.update);
     const deleteTask = useMutation(api.tasks.remove);
+    const addComment = useMutation(api.tasks.addComment);
     const teamMembers = useQuery(api.teamMembers.list);
 
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+    const [isAddingComment, setIsAddingComment] = useState(false);
+    const [commentInput, setCommentInput] = useState('');
+    const [commentError, setCommentError] = useState<string | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [editData, setEditData] = useState({
         title: '',
         description: '',
-        priority: 'medium' as 'low' | 'medium' | 'high',
-        status: 'todo' as 'todo' | 'in-progress' | 'review' | 'done',
+        priority: 'medium' as TaskPriority,
+        status: 'todo' as TaskStatus,
         dueDate: '',
         assigneeId: '' as string,
         tags: '',
@@ -76,8 +97,8 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                 priority: editData.priority,
                 status: editData.status,
                 dueDate: editData.dueDate,
-                assigneeId: editData.assigneeId as Id<"teamMembers">,
-                tags: editData.tags.split(',').map(t => t.trim()).filter(Boolean),
+                assigneeId: editData.assigneeId as Id<'teamMembers'>,
+                tags: editData.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
             });
             setIsEditing(false);
         } catch (error) {
@@ -97,6 +118,34 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
             console.error('Failed to delete task:', error);
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleAddComment = async () => {
+        const content = commentInput.trim();
+        if (!content) return;
+
+        setIsAddingComment(true);
+        setCommentError(null);
+        try {
+            await addComment({ taskId, content });
+            setCommentInput('');
+        } catch (error) {
+            console.error('Failed to add comment:', error);
+            setCommentError(error instanceof Error ? error.message : 'Failed to add comment.');
+        } finally {
+            setIsAddingComment(false);
+        }
+    };
+
+    const handleMarkComplete = async () => {
+        setIsMarkingComplete(true);
+        try {
+            await updateTask({ id: taskId, status: 'done' });
+        } catch (error) {
+            console.error('Failed to mark task complete:', error);
+        } finally {
+            setIsMarkingComplete(false);
         }
     };
 
@@ -143,7 +192,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
         }
     };
 
-    // Loading state
     if (task === undefined) {
         return (
             <div
@@ -173,6 +221,9 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
         );
     }
 
+    const comments = (task.comments ?? []) as TaskComment[];
+    const canComment = currentMember !== null && currentMember !== undefined;
+
     return (
         <div
             ref={modalRef}
@@ -180,14 +231,13 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
         >
             <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden animate-scale-fade">
-                {/* Header */}
                 <div className="p-5 border-b border-[#232323] flex items-start justify-between">
                     <div className="flex-1 pr-4">
                         {isEditing ? (
                             <input
                                 type="text"
                                 value={editData.title}
-                                onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                                onChange={(e) => setEditData((prev) => ({ ...prev, title: e.target.value }))}
                                 className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-xl font-semibold focus:outline-none focus:border-[#F0FF7A]"
                             />
                         ) : (
@@ -214,7 +264,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                     <X className="w-5 h-5" />
                                 </button>
                                 <button
-                                    onClick={handleSave}
+                                    onClick={() => void handleSave()}
                                     disabled={isSaving}
                                     className="flex items-center gap-2 px-3 py-2 bg-[#F0FF7A] text-[#010101] rounded-lg text-sm font-medium disabled:opacity-50"
                                 >
@@ -247,7 +297,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                     </div>
                 </div>
 
-                {/* Delete Confirmation */}
                 {showDeleteConfirm && (
                     <div className="p-4 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between">
                         <p className="text-sm text-red-400">Are you sure you want to delete this task?</p>
@@ -259,7 +308,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 Cancel
                             </button>
                             <button
-                                onClick={handleDelete}
+                                onClick={() => void handleDelete()}
                                 disabled={isDeleting}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm disabled:opacity-50"
                             >
@@ -270,18 +319,15 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                     </div>
                 )}
 
-                {/* Content */}
                 <div className="p-5 overflow-y-auto max-h-[calc(90vh-180px)]">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Main Content */}
                         <div className="md:col-span-2 space-y-6">
-                            {/* Description */}
                             <div>
                                 <h3 className="text-sm font-medium text-gray-400 mb-2">Description</h3>
                                 {isEditing ? (
                                     <textarea
                                         value={editData.description}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, description: e.target.value }))}
                                         rows={4}
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-[#F0FF7A] resize-none"
                                     />
@@ -290,20 +336,20 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 )}
                             </div>
 
-                            {/* Comments */}
                             <div>
-                                <h3 className="text-sm font-medium text-gray-400 mb-3">
-                                    Comments ({task.comments?.length ?? 0})
+                                <h3 className="text-sm font-medium text-gray-400 mb-3 flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4" />
+                                    Comments ({comments.length})
                                 </h3>
 
-                                {(task.comments?.length ?? 0) > 0 ? (
-                                    <div className="space-y-4">
-                                        {task.comments?.map((comment: any) => (
+                                {comments.length > 0 ? (
+                                    <div className="space-y-4 mb-4">
+                                        {comments.map((comment) => (
                                             <div key={comment._id} className="flex gap-3">
                                                 {comment.author?.avatar ? (
                                                     <img
                                                         src={comment.author.avatar}
-                                                        alt={comment.author.name}
+                                                        alt={comment.author?.name ?? 'Author'}
                                                         className="w-8 h-8 rounded-full"
                                                     />
                                                 ) : (
@@ -315,29 +361,49 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="font-medium text-sm">{comment.author?.name ?? 'Unknown'}</span>
                                                         <span className="text-xs text-gray-500">
-                                                            {new Date(comment.createdAt).toLocaleDateString()}
+                                                            {new Date(comment.createdAt).toLocaleString()}
                                                         </span>
                                                     </div>
-                                                    <p className="text-sm text-gray-300">{comment.content}</p>
+                                                    <p className="text-sm text-gray-300 whitespace-pre-wrap">{comment.content}</p>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-500 italic">No comments yet</p>
+                                    <p className="text-sm text-gray-500 italic mb-4">No comments yet</p>
                                 )}
+
+                                <div className="space-y-2">
+                                    <textarea
+                                        value={commentInput}
+                                        onChange={(e) => setCommentInput(e.target.value)}
+                                        placeholder={canComment ? 'Write a comment...' : 'Join the team to comment'}
+                                        rows={3}
+                                        disabled={!canComment || isAddingComment}
+                                        className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-3 text-sm text-gray-300 focus:outline-none focus:border-[#F0FF7A] resize-none disabled:opacity-60"
+                                    />
+                                    {commentError && <p className="text-xs text-red-400">{commentError}</p>}
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={() => void handleAddComment()}
+                                            disabled={!canComment || isAddingComment || commentInput.trim().length === 0}
+                                            className="flex items-center gap-2 px-3 py-2 bg-[#F0FF7A] text-[#010101] rounded-lg text-sm font-medium disabled:opacity-50"
+                                        >
+                                            {isAddingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                            Add Comment
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Sidebar */}
                         <div className="space-y-5">
-                            {/* Status */}
                             {isEditing && (
                                 <div>
                                     <h3 className="text-sm font-medium text-gray-400 mb-2">Status</h3>
                                     <select
                                         value={editData.status}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, status: e.target.value as any }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, status: e.target.value as TaskStatus }))}
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
                                     >
                                         <option value="todo">To Do</option>
@@ -348,7 +414,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 </div>
                             )}
 
-                            {/* Priority */}
                             <div>
                                 <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
                                     <Flag className="w-4 h-4" />
@@ -357,7 +422,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 {isEditing ? (
                                     <select
                                         value={editData.priority}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, priority: e.target.value as any }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, priority: e.target.value as TaskPriority }))}
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
                                     >
                                         <option value="low">Low</option>
@@ -371,7 +436,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 )}
                             </div>
 
-                            {/* Assignee */}
                             <div>
                                 <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
                                     <User className="w-4 h-4" />
@@ -380,7 +444,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 {isEditing ? (
                                     <select
                                         value={editData.assigneeId}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, assigneeId: e.target.value }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, assigneeId: e.target.value }))}
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
                                     >
                                         {teamMembers?.map((member) => (
@@ -410,7 +474,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 )}
                             </div>
 
-                            {/* Due Date */}
                             <div>
                                 <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
                                     <Calendar className="w-4 h-4" />
@@ -420,7 +483,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                     <input
                                         type="date"
                                         value={editData.dueDate}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, dueDate: e.target.value }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, dueDate: e.target.value }))}
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
                                     />
                                 ) : (
@@ -428,7 +491,6 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                 )}
                             </div>
 
-                            {/* Tags */}
                             <div>
                                 <h3 className="text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
                                     <Tag className="w-4 h-4" />
@@ -438,7 +500,7 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                     <input
                                         type="text"
                                         value={editData.tags}
-                                        onChange={(e) => setEditData(prev => ({ ...prev, tags: e.target.value }))}
+                                        onChange={(e) => setEditData((prev) => ({ ...prev, tags: e.target.value }))}
                                         placeholder="design, frontend..."
                                         className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
                                     />
@@ -460,19 +522,17 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="p-4 border-t border-[#232323] flex items-center justify-between">
                     <p className="text-xs text-gray-500">
                         Created {new Date(task.createdAt).toLocaleDateString()}
                     </p>
                     {!isEditing && (
                         <button
-                            onClick={() => {
-                                updateTask({ id: taskId, status: 'done' });
-                            }}
-                            className="px-4 py-2 bg-[#181818] rounded-lg text-sm hover:bg-[#232323] transition-colors"
+                            onClick={() => void handleMarkComplete()}
+                            disabled={isMarkingComplete}
+                            className="px-4 py-2 bg-[#181818] rounded-lg text-sm hover:bg-[#232323] transition-colors disabled:opacity-50"
                         >
-                            Mark Complete
+                            {isMarkingComplete ? 'Updating...' : 'Mark Complete'}
                         </button>
                     )}
                 </div>

@@ -24,7 +24,47 @@ TeamSync is a Next.js 16 App Router app for internal team collaboration with:
 - Recharts `3.7.0`
 - Radix/shadcn-style UI components in `components/ui`
 
-## 3) High-Level Structure
+## 3) Quick Start for Agents
+
+Use this flow before making changes:
+
+```bash
+git status -sb
+npm ci
+npx convex dev
+npm run dev
+```
+
+Recommended first reads:
+- `agent.md` (this file)
+- `app/(dashboard)/layout.tsx`
+- `components/AppLayout.tsx`
+- `components/Sidebar.tsx`
+- `components/Header.tsx`
+- `components/InviteMemberModal.tsx`
+- `components/TaskModal.tsx`
+- `sections/TaskBoard.tsx`
+- `sections/TeamView.tsx`
+- `sections/SettingsView.tsx`
+- `convex/schema.ts`
+- `convex/users.ts`
+- `convex/tasks.ts`
+- `convex/documents.ts`
+
+Pre-PR checks:
+
+```bash
+npx eslint sections/TaskBoard.tsx sections/TeamView.tsx sections/SettingsView.tsx convex/users.ts convex/tasks.ts convex/invites.ts convex/schema.ts
+npm run build
+```
+
+If schema/functions changed, run Convex deploy before app deploy:
+
+```bash
+npx convex deploy --yes
+```
+
+## 4) High-Level Structure
 
 ```
 app/
@@ -81,7 +121,7 @@ convex/
   seed.ts
 ```
 
-## 4) Routing and Auth
+## 5) Routing and Auth
 
 Protected app routes are under `app/(dashboard)/*`.
 
@@ -95,7 +135,7 @@ Client-side guard:
 Join flow:
 - `/join?code=...` route drives invite redemption + onboarding
 
-## 5) Provider Hierarchy
+## 6) Provider Hierarchy
 
 Root (`app/layout.tsx`):
 - `ConvexAuthNextjsServerProvider`
@@ -107,7 +147,7 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 - `TaskModalProvider`
 - `AppLayout`
 
-## 6) Real Data vs Mock UI
+## 7) Real Data vs Mock UI
 
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
@@ -118,6 +158,8 @@ Real Convex-backed sections:
 - `sections/DocumentsView.tsx`
 - `sections/ProfileView.tsx`
 - `components/Header.tsx` menu data and counts
+- `components/TaskModal.tsx` task reads/updates/comments
+- `components/InviteMemberModal.tsx` invite lifecycle management
 
 Partially local/mock UI state:
 - `sections/SettingsView.tsx`
@@ -125,7 +167,7 @@ Partially local/mock UI state:
   - auth-backed/read-only: full name and email from authenticated GitHub user
   - still local-only: danger-zone actions
 
-## 7) Current Navigation Behavior
+## 8) Current Navigation Behavior
 
 ### Sidebar (`components/Sidebar.tsx`)
 
@@ -141,10 +183,11 @@ Partially local/mock UI state:
 - Real dropdown data:
   - team activity from `api.dashboard.getActivity`
   - due alerts from `api.dashboard.getDueTasks`
+- activity stream now includes task and invite lifecycle events (from mutations in `convex/tasks.ts` and `convex/invites.ts`)
 - Profile menu routes to `/profile` and `/settings`
 - `New Task` opens `AddTaskModal`
 
-## 8) Access Levels and Permissions
+## 9) Access Levels and Permissions
 
 Access levels in `teamMembers.accessLevel`:
 - `admin`
@@ -152,12 +195,16 @@ Access levels in `teamMembers.accessLevel`:
 - `viewer`
 
 Key rules:
-- invite creation: admin only (`convex/invites.ts`)
-- member removal: admin only (`convex/teamMembers.ts`)
+- invite create/list/extend/revoke: admin only (`convex/invites.ts`)
+- member removal: admin only, and last admin cannot be removed (`convex/teamMembers.ts`)
+- member access-level changes: admin only for `accessLevel`, and last admin cannot be demoted (`convex/teamMembers.ts`)
+- task create/update/status/comment/delete mutations require authenticated team membership (`convex/tasks.ts`)
+- task comment author is resolved server-side from auth; client cannot spoof author identity (`convex/tasks.ts`)
+- task deletion: admin or task owner (`convex/tasks.ts`)
 - docs editing: admin/member
 - docs deletion: admin or document owner
 
-## 9) Documents Feature (Important)
+## 10) Documents Feature (Important)
 
 Main files:
 - backend: `convex/documents.ts`
@@ -178,7 +225,7 @@ Design notes:
 - `documentVersions` is immutable history
 - file access is via Convex signed URLs from `getDownloadUrl`
 
-## 10) Convex Schema Overview
+## 11) Convex Schema Overview
 
 Core tables:
 - `teamMembers`
@@ -193,12 +240,13 @@ Core tables:
 - `events`
 - `activityLog`
 - `userProfiles`
+  - includes persisted settings and `taskSavedViews` (saved task board filters/views)
 
 Convex auth tables are included via `authTables`.
 
-## 11) Known Caveats and TODOs
+## 12) Known Caveats and TODOs
 
-1. Personal task filtering now depends on `api.teamMembers.getCurrentMember`:
+1. Personal task filtering depends on `api.teamMembers.getCurrentMember`:
    - users without a team member record will not load personal tasks
    - ensure onboarding/membership creation completes for new users
 
@@ -207,12 +255,21 @@ Convex auth tables are included via `authTables`.
    - this exists because those deps are imported by UI components but are not in `package.json`/`package-lock.json`
    - long-term fix: add them to package manifests and remove workaround
 
-3. `SettingsView` is partially persisted:
+3. Local `npm run build` still fails on fresh install due missing runtime deps (e.g. `react-day-picker`) unless workaround deps are installed:
+   - this is the same dependency gap noted above
+   - Docker image builds because it currently installs missing deps during build
+
+4. `SettingsView` is partially persisted:
    - preferences save to Convex via `api.users.getSettings` / `api.users.updateSettings`
    - account profile fields (job title/location/timezone) save via `api.users.getProfile` / `api.users.updateProfile`
    - account deletion is still UI-only placeholder behavior
 
-## 12) Local Development
+5. Saved task views in `TaskBoard`:
+   - stored in `userProfiles.taskSavedViews`
+   - capped to a small recent set (currently 8)
+   - names are user-defined from a prompt; there is no rename UI yet
+
+## 13) Local Development
 
 Run both app and Convex dev:
 
@@ -224,7 +281,7 @@ npx convex dev
 If backend types drift:
 - restart `npx convex dev` to regenerate `_generated` types
 
-## 13) Deployment Notes
+## 14) Deployment Notes
 
 Deployment is Docker/Compose based.
 
@@ -238,7 +295,7 @@ Detailed operational steps are documented in local `DEPLOYMENT.md` (intentionall
 General rule:
 - when touching deployment, keep `NEXT_PUBLIC_*` env handling valid at both build time and runtime.
 
-## 14) Agent Editing Guidance for This Repo
+## 15) Agent Editing Guidance for This Repo
 
 - Do not edit `convex/_generated/*` manually.
 - Prefer updating Convex functions and letting generated types follow.

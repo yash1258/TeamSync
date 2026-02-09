@@ -72,7 +72,7 @@ Acceptance criteria:
 
 ### 1.4 Validation for Phase 1
 
-Status: `IN PROGRESS`
+Status: `COMPLETED`
 
 Tasks:
 - run targeted lint on touched files ✅
@@ -197,7 +197,7 @@ Tasks:
 - keep invite management admin-only with backend enforcement ✅
 - enrich invite list payload with usage/expiration metadata ✅
 - expand invite modal with active invite management and history ✅
-- remaining: add invite audit trail in activity log
+- add invite audit trail in activity log ✅
 
 Acceptance criteria:
 - admins can generate, copy, extend, and revoke active invite links

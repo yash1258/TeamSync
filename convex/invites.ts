@@ -49,6 +49,20 @@ const requireAdminMember = async (ctx: MutationCtx) => {
     return member;
 };
 
+const logInviteActivity = async (
+    ctx: MutationCtx,
+    memberId: Id<"teamMembers">,
+    action: string,
+    target: string
+) => {
+    await ctx.db.insert("activityLog", {
+        userId: memberId,
+        action,
+        target,
+        createdAt: Date.now(),
+    });
+};
+
 // Create an invite link (admin only)
 export const create = mutation({
     args: {
@@ -70,6 +84,7 @@ export const create = mutation({
             expiresAt,
         });
 
+        await logInviteActivity(ctx, member._id, "created invite", code);
         return { code, inviteId, expiresAt };
     },
 });
@@ -159,6 +174,7 @@ export const redeem = mutation({
             usedAt: Date.now(),
         });
 
+        await logInviteActivity(ctx, memberId, "joined team via invite", invite.code);
         return memberId;
     },
 });
@@ -198,13 +214,14 @@ export const list = query({
 export const revoke = mutation({
     args: { id: v.id("invites") },
     handler: async (ctx, args) => {
-        await requireAdminMember(ctx);
+        const member = await requireAdminMember(ctx);
 
         const invite = await ctx.db.get(args.id);
         if (!invite) throw new Error("Invite not found");
         if (invite.usedBy) throw new Error("Used invites cannot be revoked");
 
         await ctx.db.delete(args.id);
+        await logInviteActivity(ctx, member._id, "revoked invite", invite.code);
         return { id: args.id };
     },
 });
@@ -216,7 +233,7 @@ export const extend = mutation({
         expiresInDays: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        await requireAdminMember(ctx);
+        const member = await requireAdminMember(ctx);
 
         const invite = await ctx.db.get(args.id);
         if (!invite) throw new Error("Invite not found");
@@ -230,6 +247,12 @@ export const extend = mutation({
         const baseTime = Math.max(invite.expiresAt, Date.now());
         const expiresAt = baseTime + (extensionDays * DAY_MS);
         await ctx.db.patch(invite._id, { expiresAt });
+        await logInviteActivity(
+            ctx,
+            member._id,
+            `extended invite by ${extensionDays}d`,
+            invite.code
+        );
 
         return { id: invite._id, expiresAt };
     },

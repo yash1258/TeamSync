@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
-import { useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -91,6 +91,8 @@ const healthClass = {
 
 export function ProjectsView() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const { openTask } = useTaskModal();
 
   const rawTeamTasks = useQuery(api.tasks.listTeam);
@@ -118,6 +120,16 @@ export function ProjectsView() {
       setShowCreateProjectModal(true);
     }
   }, [searchParams]);
+
+  const closeCreateProjectModal = () => {
+    setShowCreateProjectModal(false);
+    if (searchParams.get('create') !== '1') return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('create');
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  };
 
   const teamTasks = useMemo(() => rawTeamTasks ?? [], [rawTeamTasks]);
   const planningProjects = useMemo(
@@ -286,7 +298,7 @@ export function ProjectsView() {
       }
 
       setProjectFilter(title);
-      setShowCreateProjectModal(false);
+      closeCreateProjectModal();
       setProjectDraft({
         title: '',
         summary: '',
@@ -521,7 +533,7 @@ export function ProjectsView() {
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => {
             if (!isCreatingProject) {
-              setShowCreateProjectModal(false);
+              closeCreateProjectModal();
             }
           }}
         >
@@ -535,7 +547,7 @@ export function ProjectsView() {
                 <p className="text-xs text-gray-500 mt-1">Create a project record and optional kickoff issue.</p>
               </div>
               <button
-                onClick={() => setShowCreateProjectModal(false)}
+                onClick={closeCreateProjectModal}
                 disabled={isCreatingProject}
                 className="p-2 rounded-lg hover:bg-[#181818] text-gray-500 hover:text-white transition-colors disabled:opacity-50"
               >
@@ -620,7 +632,7 @@ export function ProjectsView() {
               <div className="pt-2 border-t border-[#232323] flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateProjectModal(false)}
+                  onClick={closeCreateProjectModal}
                   disabled={isCreatingProject}
                   className="px-3 py-2 rounded-lg bg-[#181818] border border-[#232323] text-sm hover:border-[#333] transition-colors disabled:opacity-50"
                 >

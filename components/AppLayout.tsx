@@ -12,6 +12,7 @@ import { api } from '@/convex/_generated/api';
 import { OnboardingModal } from './OnboardingModal';
 import { CommandPalette } from './planning/CommandPalette';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
+import { useGlobalIssueShortcuts } from '@/hooks/useGlobalIssueShortcuts';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -27,12 +28,21 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     // Check if user is a team member
     const currentMember = useQuery(api.teamMembers.getCurrentMember);
+    const selectedTask = useQuery(
+        api.tasks.getById,
+        selectedTaskId ? { id: selectedTaskId } : 'skip'
+    );
     const showOnboarding =
         isAuthenticated &&
         !isAuthLoading &&
         currentMember === null &&
         pathname !== '/login' &&
         pathname !== '/join';
+
+    useGlobalIssueShortcuts({
+        currentMemberId: currentMember?._id ?? null,
+        selectedTask: selectedTask ?? null,
+    });
 
     // Close an open task modal only when route changes.
     useEffect(() => {

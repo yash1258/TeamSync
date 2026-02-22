@@ -156,7 +156,14 @@ Tasks:
 - global command palette (`Cmd/Ctrl+K`) ✅
 - quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision + fast status/priority + assignment + cycle move commands for surfaced issues done; project/cycle entity-native commands pending)
 - fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
-- keyboard shortcuts for common issue actions (palette navigation + enter-to-run done; additional direct global shortcuts pending)
+- keyboard shortcuts for common issue actions ✅
+  - direct global shortcuts for the currently opened task are active:
+    - `Alt+Shift+S`: start (`in-progress`)
+    - `Alt+Shift+D`: mark done
+    - `Alt+Shift+H`: set high priority
+    - `Alt+Shift+A`: assign to me
+    - `Alt+Shift+C`: move to current cycle tag
+    - `Alt+Shift+N`: move to next cycle tag
 
 Acceptance criteria:
 - key workflows can be completed without mouse-heavy navigation
@@ -333,6 +340,7 @@ npx convex deploy --yes
 - 2026-02-22: `940f557` added Phase 3 command palette foundation (`Cmd/Ctrl+K`, navigation, issue/decision search).
 - 2026-02-22: `b980c83` added issue status/priority action commands in the palette.
 - 2026-02-22: added assignment and cycle-move commands in the command palette (cycle tags: `cycle:current`/`cycle:next`).
+- 2026-02-22: added direct global issue shortcuts (`Alt+Shift+S/D/H/A/C/N`) for the currently opened task.
 
 ## 10) Risks and Mitigations
 

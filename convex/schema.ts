@@ -37,6 +37,142 @@ const schema = defineSchema({
     })
         .index("by_code", ["code"]),
 
+    // initiatives: High-level product goals that group projects.
+    initiatives: defineTable({
+        title: v.string(),
+        objective: v.optional(v.string()),
+        status: v.union(
+            v.literal("planned"),
+            v.literal("active"),
+            v.literal("paused"),
+            v.literal("done"),
+            v.literal("archived")
+        ),
+        priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+        ownerId: v.optional(v.id("teamMembers")),
+        targetDate: v.optional(v.string()),
+        createdBy: v.id("teamMembers"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_status", ["status"])
+        .index("by_owner", ["ownerId"])
+        .index("by_targetDate", ["targetDate"]),
+
+    // projects: Workstreams under initiatives.
+    projects: defineTable({
+        title: v.string(),
+        summary: v.optional(v.string()),
+        initiativeId: v.optional(v.id("initiatives")),
+        status: v.union(
+            v.literal("planned"),
+            v.literal("active"),
+            v.literal("on-hold"),
+            v.literal("done"),
+            v.literal("archived")
+        ),
+        health: v.union(v.literal("green"), v.literal("yellow"), v.literal("red")),
+        leadId: v.optional(v.id("teamMembers")),
+        startDate: v.optional(v.string()),
+        targetDate: v.optional(v.string()),
+        createdBy: v.id("teamMembers"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_status", ["status"])
+        .index("by_initiative", ["initiativeId"])
+        .index("by_lead", ["leadId"])
+        .index("by_targetDate", ["targetDate"]),
+
+    // cycles: Timeboxed planning windows.
+    cycles: defineTable({
+        name: v.string(),
+        goal: v.optional(v.string()),
+        startsAt: v.number(),
+        endsAt: v.number(),
+        status: v.union(
+            v.literal("planned"),
+            v.literal("active"),
+            v.literal("closed")
+        ),
+        createdBy: v.id("teamMembers"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_status", ["status"])
+        .index("by_startsAt", ["startsAt"]),
+
+    // issues: Planning-native issue records (coexists with legacy tasks during migration).
+    issues: defineTable({
+        title: v.string(),
+        description: v.optional(v.string()),
+        projectId: v.optional(v.id("projects")),
+        cycleId: v.optional(v.id("cycles")),
+        status: v.union(
+            v.literal("backlog"),
+            v.literal("todo"),
+            v.literal("in-progress"),
+            v.literal("review"),
+            v.literal("done"),
+            v.literal("canceled")
+        ),
+        priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+        estimate: v.optional(v.number()),
+        ownerId: v.id("teamMembers"),
+        assigneeId: v.optional(v.id("teamMembers")),
+        labels: v.array(v.string()),
+        dueDate: v.optional(v.string()),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_status", ["status"])
+        .index("by_project", ["projectId"])
+        .index("by_cycle", ["cycleId"])
+        .index("by_assignee", ["assigneeId"])
+        .index("by_owner", ["ownerId"])
+        .index("by_dueDate", ["dueDate"]),
+
+    // issueRelations: Directed links between issues.
+    issueRelations: defineTable({
+        fromIssueId: v.id("issues"),
+        toIssueId: v.id("issues"),
+        relationType: v.union(
+            v.literal("blocks"),
+            v.literal("depends_on"),
+            v.literal("related_to"),
+            v.literal("duplicate_of")
+        ),
+        createdBy: v.id("teamMembers"),
+        createdAt: v.number(),
+    })
+        .index("by_fromIssue", ["fromIssueId"])
+        .index("by_toIssue", ["toIssueId"])
+        .index("by_from_to_type", ["fromIssueId", "toIssueId", "relationType"]),
+
+    // decisions: ADR-style product decisions.
+    decisions: defineTable({
+        title: v.string(),
+        context: v.string(),
+        decision: v.string(),
+        consequences: v.optional(v.string()),
+        projectId: v.optional(v.id("projects")),
+        status: v.union(
+            v.literal("proposed"),
+            v.literal("accepted"),
+            v.literal("rejected"),
+            v.literal("superseded")
+        ),
+        decidedBy: v.optional(v.id("teamMembers")),
+        decidedAt: v.optional(v.number()),
+        createdBy: v.id("teamMembers"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_project", ["projectId"])
+        .index("by_status", ["status"])
+        .index("by_createdBy", ["createdBy"])
+        .index("by_decidedAt", ["decidedAt"]),
+
     // tasks: Core task management (supports team + personal tasks)
     tasks: defineTable({
         title: v.string(),

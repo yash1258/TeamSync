@@ -45,7 +45,7 @@ Out of scope for now:
 
 ### Phase 0: Foundation and Guardrails
 
-Status: `IN PROGRESS`
+Status: `COMPLETED`
 
 Goal:
 - establish safe migration and rollout controls before adding core entities.
@@ -72,7 +72,7 @@ Gate to proceed:
 
 ### Phase 1: Collaboration Domain Schema
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
 Goal:
 - introduce the core data model needed for Linear-like workflows.
@@ -89,9 +89,9 @@ Tasks:
   - `issues`
   - `issueRelations`
   - `decisions`
-- add indexes for common queries (status, owner, cycle, project, due date)
-- wire baseline CRUD queries/mutations with permission checks
-- ensure activity logging hooks for key mutations
+- add indexes for common queries (status, owner, cycle, project, due date) ✅
+- wire baseline CRUD queries/mutations with permission checks ✅
+- ensure activity logging hooks for key mutations ✅
 
 Acceptance criteria:
 - all new entities can be created/read/updated/deleted via Convex

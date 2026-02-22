@@ -49,6 +49,11 @@ Recommended first reads:
 - `convex/schema.ts`
 - `convex/users.ts`
 - `convex/tasks.ts`
+- `convex/initiatives.ts`
+- `convex/projects.ts`
+- `convex/cycles.ts`
+- `convex/issues.ts`
+- `convex/decisions.ts`
 - `convex/documents.ts`
 
 Pre-PR checks:
@@ -111,6 +116,13 @@ convex/
   auth.ts
   http.ts
   users.ts
+  planningAuth.ts
+  initiatives.ts
+  projects.ts
+  cycles.ts
+  issues.ts
+  issueRelations.ts
+  decisions.ts
   teamMembers.ts
   invites.ts
   tasks.ts
@@ -233,6 +245,12 @@ Core tables:
 - `invites`
 - `tasks`
 - `comments`
+- `initiatives`
+- `projects`
+- `cycles`
+- `issues`
+- `issueRelations`
+- `decisions`
 - `documents`
 - `documentVersions`
 - `budgetItems`

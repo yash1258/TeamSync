@@ -128,7 +128,7 @@ Tasks:
 - project creation flow in `ProjectsView` with modal CTA + optional kickoff issue creation ✅
 - project creation entrypoints from Planning Hub and command palette (`/projects?create=1`) ✅
 - cycle planner (current/upcoming/closed) ✅
-- issue detail drawer/modal with relations and activity (activity wired, issue-relations UI pending)
+- issue detail drawer/modal with native issue relation management (`depends_on`, `blocks`, `related_to`, `duplicate_of`) ✅
 - decision log list + detail + link-to-issue/project ✅
 - dedicated routes and sidebar entries for Projects/Roadmap/Decisions ✅
 - route + middleware rollout gating for planning modules ✅
@@ -349,6 +349,7 @@ npx convex deploy --yes
 - 2026-02-22: added shortcut cheat sheet UI in command palette and task modal.
 - 2026-02-22: added project creation UX polish (new `ProjectsView` CTA/modal, optional kickoff issue, improved filter/toggle spacing).
 - 2026-02-22: added project creation entrypoints from Planning Hub and command palette (`Create Project` -> `/projects?create=1`).
+- 2026-02-22: added native issue collaboration panel in Planning Hub with in-app native issue creation and relation drawer (add/remove issue links + quick status/priority updates).
 
 ## 10) Risks and Mitigations
 

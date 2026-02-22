@@ -194,7 +194,7 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
-- `sections/PlanningView.tsx`
+- `sections/PlanningView.tsx` (task triage + native issue relation drawer)
 - `sections/ProjectsView.tsx` (hybrid: `projects` table records + task tags)
 - `sections/RoadmapView.tsx` (currently derived from `tasks` + milestones)
 - `sections/DecisionsView.tsx` (currently derived from documents + versions)
@@ -324,6 +324,8 @@ Convex auth tables are included via `authTables`.
    - names are user-defined from a prompt; there is no rename UI yet
 
 6. Planning Phase 2 uses temporary derived data:
+   - `PlanningView` now includes a native issue lane (`issues` table) with an issue detail drawer for relation management (`issueRelations`)
+   - native issue creation/editing in Planning is separate from legacy task creation (`tasks`)
    - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation
    - project creation currently auto-links execution via optional kickoff task tags (`project:<slug>`)
    - `RoadmapView` is still sourced from `tasks` + milestone conventions

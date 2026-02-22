@@ -13,15 +13,22 @@ import {
   FolderKanban,
   CheckCircle2,
   AlertTriangle,
+  GitBranchPlus,
+  Link2,
+  Sparkles,
+  X,
 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { AddTaskModal } from '@/components/AddTaskModal';
+import { IssueDetailDrawer } from '@/components/planning/IssueDetailDrawer';
 import { useTaskModal } from '@/components/TaskModalContext';
 import type { Id } from '@/convex/_generated/dataModel';
 
 type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
+type NativeIssueStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done' | 'canceled';
+type NativeIssuePriority = 'low' | 'medium' | 'high';
 
 interface ProjectBucket {
   name: string;
@@ -32,6 +39,19 @@ interface ProjectBucket {
     priority: 'low' | 'medium' | 'high';
     dueDate: string;
   }>;
+}
+
+interface NativeIssue {
+  _id: Id<'issues'>;
+  title: string;
+  description?: string;
+  status: NativeIssueStatus;
+  priority: NativeIssuePriority;
+  projectTitle?: string | null;
+  cycleName?: string | null;
+  assigneeName?: string | null;
+  dueDate?: string;
+  updatedAt: number;
 }
 
 const getProjectTag = (tags: string[]) => {
@@ -63,17 +83,31 @@ export function PlanningView() {
   );
   const activity = useQuery(api.dashboard.getActivity, { limit: 8 });
   const documents = useQuery(api.documents.list, {});
+  const nativeIssues = useQuery(api.issues.list, {});
 
   const updateStatus = useMutation(api.tasks.updateStatus);
+  const createIssue = useMutation(api.issues.create);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showNativeIssueModal, setShowNativeIssueModal] = useState(false);
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [updatingTaskId, setUpdatingTaskId] = useState<Id<'tasks'> | null>(null);
+  const [selectedNativeIssueId, setSelectedNativeIssueId] = useState<Id<'issues'> | null>(null);
+  const [isCreatingNativeIssue, setIsCreatingNativeIssue] = useState(false);
+  const [nativeIssueError, setNativeIssueError] = useState<string | null>(null);
+  const [nativeIssueDraft, setNativeIssueDraft] = useState({
+    title: '',
+    description: '',
+    priority: 'medium' as NativeIssuePriority,
+    status: 'backlog' as NativeIssueStatus,
+    dueDate: '',
+  });
 
   const resolvedTeamTasks = useMemo(() => teamTasks ?? [], [teamTasks]);
   const resolvedPersonalTasks = useMemo(() => personalTasks ?? [], [personalTasks]);
   const resolvedActivity = useMemo(() => activity ?? [], [activity]);
   const resolvedDocuments = useMemo(() => documents ?? [], [documents]);
+  const resolvedNativeIssues = useMemo(() => (nativeIssues ?? []) as NativeIssue[], [nativeIssues]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -92,7 +126,7 @@ export function PlanningView() {
     elements?.forEach((el) => observer.observe(el));
 
     return () => observer.disconnect();
-  }, [resolvedTeamTasks, resolvedPersonalTasks, resolvedActivity, resolvedDocuments]);
+  }, [resolvedTeamTasks, resolvedPersonalTasks, resolvedActivity, resolvedDocuments, resolvedNativeIssues]);
 
   const triageTasks = useMemo(
     () =>
@@ -177,6 +211,19 @@ export function PlanningView() {
     [resolvedPersonalTasks]
   );
 
+  const activeNativeIssues = useMemo(
+    () =>
+      resolvedNativeIssues
+        .filter((issue) => issue.status !== 'done' && issue.status !== 'canceled')
+        .sort((a, b) => b.updatedAt - a.updatedAt),
+    [resolvedNativeIssues]
+  );
+
+  const relationReadyIssues = useMemo(
+    () => resolvedNativeIssues.filter((issue) => issue.status !== 'canceled').slice(0, 8),
+    [resolvedNativeIssues]
+  );
+
   const handlePushTaskForward = async (taskId: Id<'tasks'>, currentStatus: TaskStatus) => {
     const nextStatus: TaskStatus =
       currentStatus === 'todo'
@@ -196,10 +243,45 @@ export function PlanningView() {
     }
   };
 
+  const handleCreateNativeIssue = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const title = nativeIssueDraft.title.trim();
+    if (!title) {
+      setNativeIssueError('Issue title is required.');
+      return;
+    }
+
+    setNativeIssueError(null);
+    setIsCreatingNativeIssue(true);
+    try {
+      const issueId = await createIssue({
+        title,
+        description: nativeIssueDraft.description.trim() || undefined,
+        status: nativeIssueDraft.status,
+        priority: nativeIssueDraft.priority,
+        dueDate: nativeIssueDraft.dueDate || undefined,
+      });
+      setNativeIssueDraft({
+        title: '',
+        description: '',
+        priority: 'medium',
+        status: 'backlog',
+        dueDate: '',
+      });
+      setShowNativeIssueModal(false);
+      setSelectedNativeIssueId(issueId);
+    } catch (error) {
+      setNativeIssueError(error instanceof Error ? error.message : 'Failed to create issue.');
+    } finally {
+      setIsCreatingNativeIssue(false);
+    }
+  };
+
   if (
     teamTasks === undefined ||
     activity === undefined ||
     documents === undefined ||
+    nativeIssues === undefined ||
     (currentMember?._id && personalTasks === undefined)
   ) {
     return (
@@ -404,6 +486,88 @@ export function PlanningView() {
         </div>
       </div>
 
+      <div className="animate-on-scroll opacity-0 grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 bg-[#0B0B0B] border border-[#232323] rounded-xl p-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+            <h2 className="font-medium flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-[#F0FF7A]" />
+              Native Issues and Relations
+            </h2>
+            <button
+              onClick={() => setShowNativeIssueModal(true)}
+              className="inline-flex items-center gap-2 bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm hover:border-[#333] transition-colors"
+            >
+              <GitBranchPlus className="w-4 h-4 text-[#F0FF7A]" />
+              New Native Issue
+            </button>
+          </div>
+
+          {activeNativeIssues.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No active native issues yet. Create one to start linking dependencies and related work.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {activeNativeIssues.slice(0, 8).map((issue) => (
+                <button
+                  key={issue._id}
+                  onClick={() => setSelectedNativeIssueId(issue._id)}
+                  className="w-full p-3 bg-[#181818] border border-[#232323] rounded-lg text-left hover:border-[#333] transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium truncate">{issue.title}</p>
+                    <span className={`text-[10px] px-2 py-1 rounded ${getPriorityClass(issue.priority)}`}>
+                      {issue.priority}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                    <span>{issue.status}</span>
+                    {issue.projectTitle ? (
+                      <>
+                        <span>•</span>
+                        <span>{issue.projectTitle}</span>
+                      </>
+                    ) : null}
+                    {issue.cycleName ? (
+                      <>
+                        <span>•</span>
+                        <span>{issue.cycleName}</span>
+                      </>
+                    ) : null}
+                    {issue.dueDate ? (
+                      <>
+                        <span>•</span>
+                        <span>Due {issue.dueDate}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-[#0B0B0B] border border-[#232323] rounded-xl p-4">
+          <h2 className="font-medium mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#F0FF7A]" />
+            Relation Coverage
+          </h2>
+          <div className="space-y-3">
+            <div className="rounded-lg bg-[#181818] border border-[#232323] p-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Active Native Issues</p>
+              <p className="text-2xl font-semibold mt-1">{activeNativeIssues.length}</p>
+            </div>
+            <div className="rounded-lg bg-[#181818] border border-[#232323] p-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Relation Ready</p>
+              <p className="text-2xl font-semibold mt-1">{relationReadyIssues.length}</p>
+            </div>
+            <p className="text-xs text-gray-500">
+              Open any native issue to add dependency links (`depends_on`, `blocks`, `related_to`, `duplicate_of`).
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="animate-on-scroll opacity-0 bg-[#0B0B0B] border border-[#232323] rounded-xl p-4">
         <h2 className="font-medium mb-3 flex items-center gap-2">
           <Flag className="w-4 h-4 text-[#F0FF7A]" />
@@ -464,6 +628,150 @@ export function PlanningView() {
         onClose={() => setShowAddModal(false)}
         defaultVisibility="team"
       />
+
+      {showNativeIssueModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => {
+            if (!isCreatingNativeIssue) {
+              setShowNativeIssueModal(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-lg bg-[#0B0B0B] border border-[#232323] rounded-xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-[#232323] flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Create Native Issue</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Native issues support dependency links through the Issue Relations drawer.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowNativeIssueModal(false)}
+                className="p-2 rounded-lg hover:bg-[#181818] text-gray-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNativeIssue} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Title *</label>
+                <input
+                  value={nativeIssueDraft.title}
+                  onChange={(event) =>
+                    setNativeIssueDraft((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  placeholder="Define issue scope"
+                  className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F0FF7A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Description</label>
+                <textarea
+                  value={nativeIssueDraft.description}
+                  onChange={(event) =>
+                    setNativeIssueDraft((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                  rows={3}
+                  placeholder="Context, constraints, and success criteria"
+                  className="w-full bg-[#181818] border border-[#232323] rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F0FF7A] resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">Status</label>
+                  <select
+                    value={nativeIssueDraft.status}
+                    onChange={(event) =>
+                      setNativeIssueDraft((current) => ({
+                        ...current,
+                        status: event.target.value as NativeIssueStatus,
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  >
+                    <option value="backlog">Backlog</option>
+                    <option value="todo">To Do</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="review">Review</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">Priority</label>
+                  <select
+                    value={nativeIssueDraft.priority}
+                    onChange={(event) =>
+                      setNativeIssueDraft((current) => ({
+                        ...current,
+                        priority: event.target.value as NativeIssuePriority,
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">Due Date</label>
+                  <input
+                    type="date"
+                    value={nativeIssueDraft.dueDate}
+                    onChange={(event) =>
+                      setNativeIssueDraft((current) => ({
+                        ...current,
+                        dueDate: event.target.value,
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  />
+                </div>
+              </div>
+
+              {nativeIssueError ? <p className="text-xs text-red-400">{nativeIssueError}</p> : null}
+
+              <div className="pt-3 border-t border-[#232323] flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNativeIssueModal(false)}
+                  disabled={isCreatingNativeIssue}
+                  className="px-4 py-2 bg-[#181818] rounded-lg text-sm hover:bg-[#232323] transition-colors disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingNativeIssue}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#F0FF7A] text-[#010101] rounded-lg text-sm font-medium disabled:opacity-60"
+                >
+                  {isCreatingNativeIssue ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Create Issue
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {selectedNativeIssueId ? (
+        <IssueDetailDrawer
+          issueId={selectedNativeIssueId}
+          onClose={() => setSelectedNativeIssueId(null)}
+        />
+      ) : null}
     </div>
   );
 }

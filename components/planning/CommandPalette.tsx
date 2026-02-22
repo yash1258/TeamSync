@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
-  CalendarDays,
   Compass,
   FileText,
   FolderKanban,
@@ -57,7 +56,6 @@ const baseRoutes: RouteCommand[] = [
   { href: '/tasks', label: 'Task Board', keywords: 'issues backlog work', icon: Kanban },
   { href: '/budget', label: 'Budget', keywords: 'finance spend expenses', icon: Wallet },
   { href: '/team', label: 'Team', keywords: 'members access people', icon: Users },
-  { href: '/calendar', label: 'Calendar', keywords: 'events milestones schedule', icon: CalendarDays },
   { href: '/docs', label: 'Docs', keywords: 'documents adr notes', icon: FileText },
   { href: '/settings', label: 'Settings', keywords: 'preferences profile', icon: Settings },
 ];

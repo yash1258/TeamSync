@@ -9,7 +9,6 @@ import {
     Kanban,
     Wallet,
     Users,
-    Calendar,
     FileText,
     ChevronLeft,
     ChevronRight,
@@ -38,7 +37,6 @@ const navItems = [
     { href: '/tasks', label: 'Task Board', icon: Kanban },
     { href: '/budget', label: 'Budget', icon: Wallet },
     { href: '/team', label: 'Team', icon: Users },
-    { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/docs', label: 'Docs', icon: FileText },
 ];
 

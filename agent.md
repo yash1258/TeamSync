@@ -9,7 +9,7 @@ TeamSync is a Next.js 16 App Router app for internal team collaboration with:
 
 - Convex Auth (GitHub OAuth)
 - Convex database/functions for app data
-- Dashboard, tasks, budget, team, calendar, profile, docs
+- Dashboard, tasks, budget, team, profile, docs
 - Access levels (`admin`, `member`, `viewer`)
 - Docker-based VPS deployment behind Nginx Proxy Manager
 
@@ -99,7 +99,6 @@ app/
     tasks/page.tsx
     budget/page.tsx
     team/page.tsx
-    calendar/page.tsx
     docs/page.tsx
     profile/page.tsx
     settings/page.tsx
@@ -134,7 +133,6 @@ sections/
   TaskBoard.tsx
   BudgetView.tsx
   TeamView.tsx
-  CalendarView.tsx
   DocumentsView.tsx
   ProfileView.tsx
   SettingsView.tsx
@@ -203,7 +201,6 @@ Real Convex-backed sections:
 - `sections/TaskBoard.tsx`
 - `sections/BudgetView.tsx`
 - `sections/TeamView.tsx`
-- `sections/CalendarView.tsx`
 - `sections/DocumentsView.tsx`
 - `sections/ProfileView.tsx`
 - `components/Header.tsx` menu data and counts

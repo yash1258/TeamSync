@@ -24,7 +24,9 @@ import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { publicFeatureFlags } from '@/lib/featureFlags';
+import { issueShortcutDefinitions, paletteShortcutDefinitions } from '@/lib/shortcuts';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -81,9 +83,11 @@ const replaceCycleTag = (tags: string[], nextCycle: string) => {
   return [...cleaned, `cycle:${normalizeCycleTag(nextCycle)}`];
 };
 
+const splitShortcutCombo = (combo: string) => combo.split('+').map((part) => part.trim());
+
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
-  const { openTask } = useTaskModal();
+  const { openTask, selectedTaskId } = useTaskModal();
 
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
   const [query, setQuery] = useState('');
@@ -146,7 +150,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       group: 'Quick Actions',
       label: 'Create Issue',
       value: 'create issue new task add issue',
-      shortcut: 'Cmd/Ctrl+N',
+      shortcut: 'Quick Action',
       icon: PlusCircle,
       run: () => closeThen(() => setShowAddTaskModal(true)),
     },
@@ -424,6 +428,63 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 </div>
               ))
             )}
+          </div>
+
+          <div className="border-t border-[#232323] bg-[#090909] px-4 py-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">Palette Shortcuts</p>
+                <div className="space-y-1.5">
+                  {paletteShortcutDefinitions.map((shortcut) => (
+                    <div key={shortcut.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-gray-300">{shortcut.label}</span>
+                      <KbdGroup>
+                        {splitShortcutCombo(shortcut.combo).map((token) => (
+                          <Kbd
+                            key={`${shortcut.id}-${token}`}
+                            className="h-6 border border-[#2A2A2A] bg-[#181818] px-1.5 text-[10px] text-gray-300"
+                          >
+                            {token}
+                          </Kbd>
+                        ))}
+                      </KbdGroup>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Issue Shortcuts</p>
+                  <span
+                    className={`text-[10px] px-2 py-1 rounded ${
+                      selectedTaskId
+                        ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {selectedTaskId ? 'Active Task Selected' : 'Open Task To Enable'}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {issueShortcutDefinitions.map((shortcut) => (
+                    <div key={shortcut.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-gray-300">{shortcut.label}</span>
+                      <KbdGroup>
+                        {splitShortcutCombo(shortcut.combo).map((token) => (
+                          <Kbd
+                            key={`${shortcut.id}-${token}`}
+                            className="h-6 border border-[#2A2A2A] bg-[#181818] px-1.5 text-[10px] text-gray-300"
+                          >
+                            {token}
+                          </Kbd>
+                        ))}
+                      </KbdGroup>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Doc, Id } from '@/convex/_generated/dataModel';
+import { issueShortcutKeys } from '@/lib/shortcuts';
 
 interface UseGlobalIssueShortcutsArgs {
   currentMemberId: Id<'teamMembers'> | null;
@@ -38,7 +39,7 @@ export function useGlobalIssueShortcuts({
 
       const key = event.key.toLowerCase();
 
-      if (key === 's') {
+      if (key === issueShortcutKeys.start) {
         if (selectedTask.status === 'in-progress') return;
         event.preventDefault();
         void updateTaskStatus({
@@ -48,7 +49,7 @@ export function useGlobalIssueShortcuts({
         return;
       }
 
-      if (key === 'd') {
+      if (key === issueShortcutKeys.done) {
         if (selectedTask.status === 'done') return;
         event.preventDefault();
         void updateTaskStatus({
@@ -58,7 +59,7 @@ export function useGlobalIssueShortcuts({
         return;
       }
 
-      if (key === 'h') {
+      if (key === issueShortcutKeys.priority) {
         if (selectedTask.priority === 'high') return;
         event.preventDefault();
         void updateTask({
@@ -68,7 +69,7 @@ export function useGlobalIssueShortcuts({
         return;
       }
 
-      if (key === 'a') {
+      if (key === issueShortcutKeys.assignMe) {
         if (!currentMemberId || selectedTask.assigneeId === currentMemberId) return;
         event.preventDefault();
         void updateTask({
@@ -78,7 +79,7 @@ export function useGlobalIssueShortcuts({
         return;
       }
 
-      if (key === 'c') {
+      if (key === issueShortcutKeys.cycleCurrent) {
         event.preventDefault();
         void updateTask({
           id: selectedTask._id,
@@ -87,7 +88,7 @@ export function useGlobalIssueShortcuts({
         return;
       }
 
-      if (key === 'n') {
+      if (key === issueShortcutKeys.cycleNext) {
         event.preventDefault();
         void updateTask({
           id: selectedTask._id,

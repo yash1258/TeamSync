@@ -57,6 +57,7 @@ Recommended first reads:
 - `sections/SettingsView.tsx`
 - `hooks/useCommandPalette.ts`
 - `hooks/useGlobalIssueShortcuts.ts`
+- `lib/shortcuts.ts`
 - `convex/schema.ts`
 - `convex/users.ts`
 - `convex/tasks.ts`
@@ -120,6 +121,9 @@ components/
 hooks/
   useCommandPalette.ts
   useGlobalIssueShortcuts.ts
+
+lib/
+  shortcuts.ts
 
 sections/
   Dashboard.tsx
@@ -330,10 +334,12 @@ Convex auth tables are included via `authTables`.
 7. Command palette scope is currently foundational:
    - global open/close (`Cmd/Ctrl+K`) and route/work-item search are implemented
    - quick actions currently cover create issue, decision entrypoint, status/priority updates, assignee changes, and cycle moves for surfaced issues
+   - command palette includes a persistent keyboard cheat sheet footer for discoverability
    - direct keyboard shortcuts are available for the currently opened task in `TaskModal`:
      - `Alt+Shift+S` start, `Alt+Shift+D` done, `Alt+Shift+H` high priority
      - `Alt+Shift+A` assign to current member
      - `Alt+Shift+C` / `Alt+Shift+N` set cycle tags (`cycle:current` / `cycle:next`)
+   - task modal sidebar includes a `Quick Keys` panel that mirrors the active shortcut set
    - cycle moves are currently tag-based (`cycle:current`, `cycle:next`) until full issues/cycles UI wiring is switched to dedicated planning tables
    - broader batch issue ops and full entity-native project/cycle commands are still pending
 

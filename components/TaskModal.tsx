@@ -5,6 +5,8 @@ import { X, MessageSquare, Calendar, Flag, User, Tag, Send, Trash2, Edit2, Save,
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
+import { issueShortcutDefinitions } from '@/lib/shortcuts';
 
 interface TaskModalProps {
     taskId: Id<'tasks'>;
@@ -26,6 +28,8 @@ interface TaskComment {
     createdAt: number;
     author?: CommentAuthor | null;
 }
+
+const splitShortcutCombo = (combo: string) => combo.split('+').map((part) => part.trim());
 
 export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
     const modalRef = useRef<HTMLDivElement>(null);
@@ -398,6 +402,32 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                         </div>
 
                         <div className="space-y-5">
+                            {!isEditing && (
+                                <div className="rounded-lg border border-[#232323] bg-[#111111] p-3">
+                                    <div className="mb-2">
+                                        <p className="text-xs font-medium text-gray-300">Quick Keys</p>
+                                        <p className="text-[11px] text-gray-500">Global shortcuts for this opened task.</p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {issueShortcutDefinitions.map((shortcut) => (
+                                            <div key={shortcut.id} className="flex items-center justify-between gap-2 text-xs">
+                                                <span className="text-gray-400">{shortcut.label}</span>
+                                                <KbdGroup>
+                                                    {splitShortcutCombo(shortcut.combo).map((token) => (
+                                                        <Kbd
+                                                            key={`${shortcut.id}-${token}`}
+                                                            className="h-5 border border-[#2A2A2A] bg-[#181818] px-1.5 text-[10px] text-gray-300"
+                                                        >
+                                                            {token}
+                                                        </Kbd>
+                                                    ))}
+                                                </KbdGroup>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {isEditing && (
                                 <div>
                                     <h3 className="text-sm font-medium text-gray-400 mb-2">Status</h3>

@@ -164,6 +164,9 @@ Tasks:
     - `Alt+Shift+A`: assign to me
     - `Alt+Shift+C`: move to current cycle tag
     - `Alt+Shift+N`: move to next cycle tag
+- shortcut discoverability UX ✅
+  - command palette footer now includes a visible keyboard cheat sheet
+  - task modal sidebar now includes a `Quick Keys` panel for active issue shortcuts
 
 Acceptance criteria:
 - key workflows can be completed without mouse-heavy navigation
@@ -341,6 +344,7 @@ npx convex deploy --yes
 - 2026-02-22: `b980c83` added issue status/priority action commands in the palette.
 - 2026-02-22: added assignment and cycle-move commands in the command palette (cycle tags: `cycle:current`/`cycle:next`).
 - 2026-02-22: added direct global issue shortcuts (`Alt+Shift+S/D/H/A/C/N`) for the currently opened task.
+- 2026-02-22: added shortcut cheat sheet UI in command palette and task modal.
 
 ## 10) Risks and Mitigations
 

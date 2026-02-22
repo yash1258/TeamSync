@@ -329,7 +329,7 @@ Convex auth tables are included via `authTables`.
    - native issue creation/editing in Planning is separate from legacy task creation (`tasks`)
    - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation
    - project creation can now create a native kickoff issue and a linked kickoff task (`project:<slug>` + `issue:<id>`)
-   - `RoadmapView` is still sourced from `tasks` + milestone conventions
+   - `RoadmapView` is now native-first (`projects` + `issues`) with task-tag fallback and milestone context
    - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
    - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`
 

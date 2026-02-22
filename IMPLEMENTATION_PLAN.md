@@ -352,6 +352,7 @@ npx convex deploy --yes
 - 2026-02-22: added native issue collaboration panel in Planning Hub with in-app native issue creation and relation drawer (add/remove issue links + quick status/priority updates).
 - 2026-02-22: added native issue command palette actions (create native issue route, open native issue drawer, native status updates, and quick dependency-link commands).
 - 2026-02-22: connected `project -> issue -> task` flow (project creation can create native kickoff issue + linked kickoff task; issue drawer can link/create tasks; task modal deep-links back to native issues).
+- 2026-02-22: rewired `RoadmapView` to native-first windows (`projects` + `issues`) with task fallback, mixed Now/Next work queues, and issue deep-links.
 
 ## 10) Risks and Mitigations
 
@@ -414,9 +415,9 @@ Status: `IN PROGRESS`
 
 ### C. Planning Surfaces Consistency
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
-- rewire `RoadmapView` to native `projects/issues/cycles` first, task tags second
+- rewire `RoadmapView` to native `projects/issues/cycles` first, task tags second ✅
 - normalize labels and counts so “issue” always refers to native `issues`, not legacy `tasks`
 - unify status chips and health logic across Planning, Projects, Roadmap
 

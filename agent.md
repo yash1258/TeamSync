@@ -327,8 +327,8 @@ Convex auth tables are included via `authTables`.
 
 7. Command palette scope is currently foundational:
    - global open/close (`Cmd/Ctrl+K`) and route/work-item search are implemented
-   - quick actions currently cover create issue + decision entrypoint
-   - advanced issue mutation shortcuts (assign/status/priority/cycle move) are pending
+   - quick actions currently cover create issue, decision entrypoint, and fast status/priority updates for surfaced issues
+   - advanced mutation shortcuts (assign/cycle move and broader batch issue ops) are pending
 
 ## 13) Local Development
 

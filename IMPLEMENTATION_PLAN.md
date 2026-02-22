@@ -154,9 +154,9 @@ Files:
 
 Tasks:
 - global command palette (`Cmd/Ctrl+K`) ✅
-- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision shortcut done; cycle/assignment/status actions pending)
+- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision + fast status/priority actions for surfaced issues done; cycle/assignment flows pending)
 - fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
-- keyboard shortcuts for common issue actions (palette navigation shortcuts done; issue action shortcuts pending)
+- keyboard shortcuts for common issue actions (palette navigation + enter-to-run done; additional direct global shortcuts pending)
 
 Acceptance criteria:
 - key workflows can be completed without mouse-heavy navigation

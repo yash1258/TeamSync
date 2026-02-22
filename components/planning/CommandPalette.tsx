@@ -18,7 +18,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 import { AddTaskModal } from '@/components/AddTaskModal';
@@ -37,7 +37,7 @@ interface RouteCommand {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-type PaletteGroup = 'Quick Actions' | 'Navigate' | 'Issues' | 'Decisions';
+type PaletteGroup = 'Quick Actions' | 'Issue Actions' | 'Navigate' | 'Issues' | 'Decisions';
 
 interface PaletteItem {
   id: string;
@@ -66,7 +66,7 @@ const planningRoutes: RouteCommand[] = [
   { href: '/decisions', label: 'Decisions', keywords: 'adr architecture review', icon: Scale },
 ];
 
-const groupOrder: PaletteGroup[] = ['Quick Actions', 'Navigate', 'Issues', 'Decisions'];
+const groupOrder: PaletteGroup[] = ['Quick Actions', 'Issue Actions', 'Navigate', 'Issues', 'Decisions'];
 
 const safeDueDate = (date: string) => {
   const parsed = Date.parse(date);
@@ -85,6 +85,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const rawTasks = useQuery(api.tasks.listTeam);
   const rawDocuments = useQuery(api.documents.list, {});
+  const updateTaskStatus = useMutation(api.tasks.updateStatus);
+  const updateTask = useMutation(api.tasks.update);
 
   const tasks = useMemo(
     () =>
@@ -108,6 +110,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   );
 
   const routes = publicFeatureFlags.planningHub ? [...planningRoutes, ...baseRoutes] : baseRoutes;
+  const issueActionCandidates = tasks.filter((task) => task.status !== 'done').slice(0, 4);
 
   const closeThen = useCallback((action: () => void) => {
     onOpenChange(false);
@@ -132,15 +135,71 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: ListChecks,
       run: () => closeThen(() => router.push('/planning')),
     },
-    {
-      id: 'create-decision',
-      group: 'Quick Actions',
-      label: 'Create Decision (Docs)',
-      value: 'create decision adr docs',
-      icon: Scale,
-      run: () => closeThen(() => router.push('/docs')),
-    },
-    ...routes.map((route) => ({
+      {
+        id: 'create-decision',
+        group: 'Quick Actions',
+        label: 'Create Decision (Docs)',
+        value: 'create decision adr docs',
+        icon: Scale,
+        run: () => closeThen(() => router.push('/docs')),
+      },
+      ...issueActionCandidates.flatMap((task) => {
+        const statusActions: PaletteItem[] = [];
+
+        if (task.status !== 'in-progress') {
+          statusActions.push({
+            id: `start-${task._id}`,
+            group: 'Issue Actions',
+            label: `Start: ${task.title}`,
+            value: `start issue in progress ${task.title}`,
+            icon: ListChecks,
+            run: () =>
+              closeThen(() => {
+                void updateTaskStatus({
+                  id: task._id,
+                  status: 'in-progress',
+                }).catch((error) => console.error('Failed to move task to in-progress', error));
+              }),
+          });
+        }
+
+        if (task.status !== 'done') {
+          statusActions.push({
+            id: `complete-${task._id}`,
+            group: 'Issue Actions',
+            label: `Mark Done: ${task.title}`,
+            value: `mark done complete issue ${task.title}`,
+            icon: ListChecks,
+            run: () =>
+              closeThen(() => {
+                void updateTaskStatus({
+                  id: task._id,
+                  status: 'done',
+                }).catch((error) => console.error('Failed to mark task done', error));
+              }),
+          });
+        }
+
+        if (task.priority !== 'high') {
+          statusActions.push({
+            id: `priority-high-${task._id}`,
+            group: 'Issue Actions',
+            label: `Set High Priority: ${task.title}`,
+            value: `set high priority issue ${task.title}`,
+            icon: PlusCircle,
+            run: () =>
+              closeThen(() => {
+                void updateTask({
+                  id: task._id,
+                  priority: 'high',
+                }).catch((error) => console.error('Failed to update task priority', error));
+              }),
+          });
+        }
+
+        return statusActions;
+      }),
+      ...routes.map((route) => ({
       id: `route-${route.href}`,
       group: 'Navigate' as const,
       label: route.label,
@@ -215,7 +274,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      filteredItems[normalizedActiveIndex]?.run();
+      void filteredItems[normalizedActiveIndex]?.run();
     }
   };
 

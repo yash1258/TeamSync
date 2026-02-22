@@ -354,6 +354,7 @@ npx convex deploy --yes
 - 2026-02-22: connected `project -> issue -> task` flow (project creation can create native kickoff issue + linked kickoff task; issue drawer can link/create tasks; task modal deep-links back to native issues).
 - 2026-02-22: rewired `RoadmapView` to native-first windows (`projects` + `issues`) with task fallback, mixed Now/Next work queues, and issue deep-links.
 - 2026-02-22: rewired `DecisionsView` to native-first decisions with docs fallback; added in-app native decision creation and linked project/issue/task context.
+- 2026-02-22: added native issue filters (status/project) in Planning Hub for faster issue triage and relation management.
 
 ## 10) Risks and Mitigations
 
@@ -411,7 +412,7 @@ Status: `IN PROGRESS`
 Status: `IN PROGRESS`
 
 - issue detail drawer with relation CRUD, quick state updates, and linked task creation/linking ✅
-- add richer issue filters (project, cycle, assignee, status) in Planning Hub
+- add richer issue filters (project, cycle, assignee, status) in Planning Hub (`project` + `status` shipped)
 - add batch operations (assign, move status, cycle) for selected native issues
 
 ### C. Planning Surfaces Consistency

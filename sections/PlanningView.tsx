@@ -47,6 +47,7 @@ interface NativeIssue {
   description?: string;
   status: NativeIssueStatus;
   priority: NativeIssuePriority;
+  projectId?: Id<'projects'>;
   projectTitle?: string | null;
   cycleName?: string | null;
   assigneeName?: string | null;
@@ -86,6 +87,7 @@ export function PlanningView() {
   const activity = useQuery(api.dashboard.getActivity, { limit: 8 });
   const documents = useQuery(api.documents.list, {});
   const nativeIssues = useQuery(api.issues.list, {});
+  const planningProjects = useQuery(api.projects.list, {});
 
   const updateStatus = useMutation(api.tasks.updateStatus);
   const createIssue = useMutation(api.issues.create);
@@ -97,6 +99,10 @@ export function PlanningView() {
   const [selectedNativeIssueId, setSelectedNativeIssueId] = useState<Id<'issues'> | null>(null);
   const [isCreatingNativeIssue, setIsCreatingNativeIssue] = useState(false);
   const [nativeIssueError, setNativeIssueError] = useState<string | null>(null);
+  const [nativeIssueStatusFilter, setNativeIssueStatusFilter] = useState<
+    'all' | 'active' | NativeIssueStatus
+  >('active');
+  const [nativeIssueProjectFilter, setNativeIssueProjectFilter] = useState<string>('all');
   const [nativeIssueDraft, setNativeIssueDraft] = useState({
     title: '',
     description: '',
@@ -115,6 +121,7 @@ export function PlanningView() {
   const resolvedActivity = useMemo(() => activity ?? [], [activity]);
   const resolvedDocuments = useMemo(() => documents ?? [], [documents]);
   const resolvedNativeIssues = useMemo(() => (nativeIssues ?? []) as NativeIssue[], [nativeIssues]);
+  const resolvedPlanningProjects = useMemo(() => planningProjects ?? [], [planningProjects]);
 
   useEffect(() => {
     if (searchParams.get('createIssue') === '1') {
@@ -234,12 +241,35 @@ export function PlanningView() {
     [resolvedPersonalTasks]
   );
 
-  const activeNativeIssues = useMemo(
+  const nativeIssueProjectOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All Projects' },
+      ...resolvedPlanningProjects.map((project) => ({
+        value: project._id,
+        label: project.title,
+      })),
+    ],
+    [resolvedPlanningProjects]
+  );
+
+  const filteredNativeIssues = useMemo(
     () =>
       resolvedNativeIssues
-        .filter((issue) => issue.status !== 'done' && issue.status !== 'canceled')
-        .sort((a, b) => b.updatedAt - a.updatedAt),
-    [resolvedNativeIssues]
+        .filter((issue) => {
+          if (nativeIssueStatusFilter === 'active') {
+            if (issue.status === 'done' || issue.status === 'canceled') return false;
+          } else if (nativeIssueStatusFilter !== 'all' && issue.status !== nativeIssueStatusFilter) {
+            return false;
+          }
+
+          if (nativeIssueProjectFilter !== 'all' && issue.projectId !== nativeIssueProjectFilter) {
+            return false;
+          }
+
+          return true;
+        })
+        .sort((left, right) => right.updatedAt - left.updatedAt),
+    [nativeIssueProjectFilter, nativeIssueStatusFilter, resolvedNativeIssues]
   );
 
   const relationReadyIssues = useMemo(
@@ -330,6 +360,7 @@ export function PlanningView() {
     activity === undefined ||
     documents === undefined ||
     nativeIssues === undefined ||
+    planningProjects === undefined ||
     (currentMember?._id && personalTasks === undefined)
   ) {
     return (
@@ -541,22 +572,53 @@ export function PlanningView() {
               <Link2 className="w-4 h-4 text-[#F0FF7A]" />
               Native Issues and Relations
             </h2>
-            <button
-              onClick={() => setShowNativeIssueModal(true)}
-              className="inline-flex items-center gap-2 bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm hover:border-[#333] transition-colors"
-            >
-              <GitBranchPlus className="w-4 h-4 text-[#F0FF7A]" />
-              New Native Issue
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={nativeIssueStatusFilter}
+                onChange={(event) =>
+                  setNativeIssueStatusFilter(
+                    event.target.value as 'all' | 'active' | NativeIssueStatus
+                  )
+                }
+                className="bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F0FF7A]"
+              >
+                <option value="active">Active</option>
+                <option value="all">All Statuses</option>
+                <option value="backlog">Backlog</option>
+                <option value="todo">To Do</option>
+                <option value="in-progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+                <option value="canceled">Canceled</option>
+              </select>
+              <select
+                value={nativeIssueProjectFilter}
+                onChange={(event) => setNativeIssueProjectFilter(event.target.value)}
+                className="bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F0FF7A]"
+              >
+                {nativeIssueProjectOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setShowNativeIssueModal(true)}
+                className="inline-flex items-center gap-2 bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm hover:border-[#333] transition-colors"
+              >
+                <GitBranchPlus className="w-4 h-4 text-[#F0FF7A]" />
+                New Native Issue
+              </button>
+            </div>
           </div>
 
-          {activeNativeIssues.length === 0 ? (
+          {filteredNativeIssues.length === 0 ? (
             <p className="text-sm text-gray-500">
-              No active native issues yet. Create one to start linking dependencies and related work.
+              No native issues found for the selected filters. Create one to start linking dependencies.
             </p>
           ) : (
             <div className="space-y-2">
-              {activeNativeIssues.slice(0, 8).map((issue) => (
+              {filteredNativeIssues.slice(0, 8).map((issue) => (
                 <button
                   key={issue._id}
                   onClick={() => openNativeIssueDrawer(issue._id)}
@@ -603,7 +665,7 @@ export function PlanningView() {
           <div className="space-y-3">
             <div className="rounded-lg bg-[#181818] border border-[#232323] p-3">
               <p className="text-xs text-gray-500 uppercase tracking-wide">Active Native Issues</p>
-              <p className="text-2xl font-semibold mt-1">{activeNativeIssues.length}</p>
+              <p className="text-2xl font-semibold mt-1">{filteredNativeIssues.length}</p>
             </div>
             <div className="rounded-lg bg-[#181818] border border-[#232323] p-3">
               <p className="text-xs text-gray-500 uppercase tracking-wide">Relation Ready</p>

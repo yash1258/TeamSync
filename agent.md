@@ -324,7 +324,7 @@ Convex auth tables are included via `authTables`.
    - names are user-defined from a prompt; there is no rename UI yet
 
 6. Planning Phase 2 uses temporary derived data:
-   - `PlanningView` now includes a native issue lane (`issues` table) with an issue detail drawer for relation management (`issueRelations`)
+   - `PlanningView` now includes a native issue lane (`issues` table) with status/project filters and an issue detail drawer for relation management (`issueRelations`)
    - issue detail drawer now also supports task linkage: create linked tasks or attach existing tasks via `issue:<id>` tags
    - native issue creation/editing in Planning is separate from legacy task creation (`tasks`)
    - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation

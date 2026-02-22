@@ -1,6 +1,31 @@
 {
   "name": "teamsync-nextjs",
   "version": "0.1.0",
+  "description": "TeamSync: collaborative planning and execution workspace connecting projects, issues, tasks, and decisions.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yash1258/TeamSync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yash1258/TeamSync/issues"
+  },
+  "homepage": "https://github.com/yash1258/TeamSync#readme",
+  "keywords": [
+    "project-management",
+    "team-collaboration",
+    "issue-tracking",
+    "task-management",
+    "roadmap-planning",
+    "linear-alternative",
+    "nextjs",
+    "convex",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=20.10.0",
+    "npm": ">=10.0.0"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev",

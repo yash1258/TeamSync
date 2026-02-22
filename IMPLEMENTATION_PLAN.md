@@ -125,6 +125,8 @@ Files:
 Tasks:
 - triage inbox for unplanned/unassigned issues ✅
 - project board/list/timeline views ✅
+- project creation flow in `ProjectsView` with modal CTA + optional kickoff issue creation ✅
+- project creation entrypoints from Planning Hub and command palette (`/projects?create=1`) ✅
 - cycle planner (current/upcoming/closed) ✅
 - issue detail drawer/modal with relations and activity (activity wired, issue-relations UI pending)
 - decision log list + detail + link-to-issue/project ✅
@@ -154,7 +156,7 @@ Files:
 
 Tasks:
 - global command palette (`Cmd/Ctrl+K`) ✅
-- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision + fast status/priority + assignment + cycle move commands for surfaced issues done; project/cycle entity-native commands pending)
+- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + create project route entry + decision + fast status/priority + assignment + cycle move commands for surfaced issues done; project/cycle entity-native commands pending)
 - fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
 - keyboard shortcuts for common issue actions ✅
   - direct global shortcuts for the currently opened task are active:
@@ -345,6 +347,8 @@ npx convex deploy --yes
 - 2026-02-22: added assignment and cycle-move commands in the command palette (cycle tags: `cycle:current`/`cycle:next`).
 - 2026-02-22: added direct global issue shortcuts (`Alt+Shift+S/D/H/A/C/N`) for the currently opened task.
 - 2026-02-22: added shortcut cheat sheet UI in command palette and task modal.
+- 2026-02-22: added project creation UX polish (new `ProjectsView` CTA/modal, optional kickoff issue, improved filter/toggle spacing).
+- 2026-02-22: added project creation entrypoints from Planning Hub and command palette (`Create Project` -> `/projects?create=1`).
 
 ## 10) Risks and Mitigations
 

@@ -168,6 +168,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: Scale,
       run: () => closeThen(() => router.push('/docs')),
     },
+    {
+      id: 'create-project',
+      group: 'Quick Actions',
+      label: 'Create Project',
+      value: 'create new project planning',
+      icon: FolderKanban,
+      run: () => closeThen(() => router.push('/projects?create=1')),
+    },
     ...issueActionCandidates.flatMap((task) => {
       const issueActions: PaletteItem[] = [];
 

@@ -15,6 +15,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { useTaskModal } from '@/components/TaskModalContext';
@@ -52,6 +53,7 @@ const getPriorityClass = (priority: string) => {
 export function PlanningView() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const { openTask } = useTaskModal();
+  const router = useRouter();
 
   const currentMember = useQuery(api.teamMembers.getCurrentMember);
   const teamTasks = useQuery(api.tasks.listTeam);
@@ -325,17 +327,26 @@ export function PlanningView() {
               <FolderKanban className="w-4 h-4 text-[#F0FF7A]" />
               Project Lenses (from `project:*` tags)
             </h2>
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F0FF7A] transition-colors"
-            >
-              {projectOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === 'all' ? 'All Projects' : option}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                className="bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#F0FF7A] transition-colors"
+              >
+                {projectOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? 'All Projects' : option}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => router.push('/projects?create=1')}
+                className="inline-flex items-center gap-2 bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm hover:border-[#333] transition-colors"
+              >
+                <Plus className="w-4 h-4 text-[#F0FF7A]" />
+                New Project
+              </button>
+            </div>
           </div>
           {filteredProjects.length === 0 ? (
             <p className="text-sm text-gray-500">

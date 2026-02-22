@@ -74,6 +74,12 @@ export const paletteShortcutDefinitions: Omit<ShortcutDefinition, 'key'>[] = [
     description: 'Run the create issue command',
   },
   {
+    id: 'createProject',
+    combo: 'Type create project',
+    label: 'Create Project',
+    description: 'Open the new project flow',
+  },
+  {
     id: 'navigate',
     combo: 'Arrow Keys',
     label: 'Navigate',

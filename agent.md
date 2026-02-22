@@ -195,7 +195,7 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
 - `sections/PlanningView.tsx`
-- `sections/ProjectsView.tsx` (currently derived from `tasks` + tags)
+- `sections/ProjectsView.tsx` (hybrid: `projects` table records + task tags)
 - `sections/RoadmapView.tsx` (currently derived from `tasks` + milestones)
 - `sections/DecisionsView.tsx` (currently derived from documents + versions)
 - `sections/TaskBoard.tsx`
@@ -324,13 +324,15 @@ Convex auth tables are included via `authTables`.
    - names are user-defined from a prompt; there is no rename UI yet
 
 6. Planning Phase 2 uses temporary derived data:
-   - `ProjectsView` and `RoadmapView` are sourced from `tasks` + tag conventions (`project:*`)
+   - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation
+   - project creation currently auto-links execution via optional kickoff task tags (`project:<slug>`)
+   - `RoadmapView` is still sourced from `tasks` + milestone conventions
    - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
    - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`
 
 7. Command palette scope is currently foundational:
    - global open/close (`Cmd/Ctrl+K`) and route/work-item search are implemented
-   - quick actions currently cover create issue, decision entrypoint, status/priority updates, assignee changes, and cycle moves for surfaced issues
+   - quick actions currently cover create issue, create project entrypoint, decision entrypoint, status/priority updates, assignee changes, and cycle moves for surfaced issues
    - command palette includes a persistent keyboard cheat sheet footer for discoverability
    - direct keyboard shortcuts are available for the currently opened task in `TaskModal`:
      - `Alt+Shift+S` start, `Alt+Shift+D` done, `Alt+Shift+H` high priority

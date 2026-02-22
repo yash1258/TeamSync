@@ -68,6 +68,10 @@ export function Header({ scrolled, onOpenCommandPalette, onToggleSidebar }: Head
         router.push(path);
     };
 
+    const handleHomeClick = () => {
+        closeMenusAndNavigate('/');
+    };
+
     const handleProfileClick = () => {
         closeMenusAndNavigate('/profile');
     };
@@ -122,6 +126,18 @@ export function Header({ scrolled, onOpenCommandPalette, onToggleSidebar }: Head
                                 <PanelLeft className="w-5 h-5" />
                             </button>
                         )}
+
+                        <button
+                            type="button"
+                            onClick={handleHomeClick}
+                            className="shrink-0 inline-flex items-center gap-2 rounded-lg border border-[#2F3F4C] bg-[#101922] px-2 py-1.5 text-sm font-semibold text-white hover:border-[#4C6375] transition-colors"
+                            aria-label="Go to dashboard"
+                        >
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#F0FF7A] text-[10px] font-bold text-[#010101]">
+                                TS
+                            </span>
+                            <span className="hidden md:inline">TeamSync</span>
+                        </button>
 
                         <button
                             type="button"

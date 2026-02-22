@@ -330,7 +330,7 @@ Convex auth tables are included via `authTables`.
    - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation
    - project creation can now create a native kickoff issue and a linked kickoff task (`project:<slug>` + `issue:<id>`)
    - `RoadmapView` is now native-first (`projects` + `issues`) with task-tag fallback and milestone context
-   - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
+   - `DecisionsView` is now hybrid: native `decisions` table first, then docs fallback for legacy ADR/decision documents
    - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`
 
 7. Command palette scope is currently foundational:

@@ -353,6 +353,7 @@ npx convex deploy --yes
 - 2026-02-22: added native issue command palette actions (create native issue route, open native issue drawer, native status updates, and quick dependency-link commands).
 - 2026-02-22: connected `project -> issue -> task` flow (project creation can create native kickoff issue + linked kickoff task; issue drawer can link/create tasks; task modal deep-links back to native issues).
 - 2026-02-22: rewired `RoadmapView` to native-first windows (`projects` + `issues`) with task fallback, mixed Now/Next work queues, and issue deep-links.
+- 2026-02-22: rewired `DecisionsView` to native-first decisions with docs fallback; added in-app native decision creation and linked project/issue/task context.
 
 ## 10) Risks and Mitigations
 
@@ -423,9 +424,9 @@ Status: `IN PROGRESS`
 
 ### D. Decisions and Evidence Chain
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
-- blend `decisions` table into `DecisionsView` (not docs-only inference)
+- blend `decisions` table into `DecisionsView` (not docs-only inference) ✅
 - add explicit links from decision -> project -> native issues -> linked tasks
 - show evidence pointers (docs/sources) in decision detail
 

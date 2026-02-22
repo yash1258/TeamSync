@@ -160,35 +160,39 @@ export function RoadmapView() {
             <p className="text-sm text-gray-500">No roadmap windows found.</p>
           ) : (
             <div className="space-y-3">
-              {filteredWindows.map((window) => (
-                <div key={window.name} className="bg-[#181818] border border-[#232323] rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium truncate">{window.name}</p>
-                    <span className="text-xs text-gray-500">
-                      {window.total} issues
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {window.startDate} {'->'} {window.endDate}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
-                    <div className="bg-[#0F0F0F] rounded px-2 py-1">Done: {window.done}</div>
-                    <div className="bg-[#0F0F0F] rounded px-2 py-1">In Progress: {window.inProgress}</div>
-                    <div className="bg-[#0F0F0F] rounded px-2 py-1">
-                      Completion: {window.total > 0 ? Math.round((window.done / window.total) * 100) : 0}%
+              {filteredWindows.map((projectWindow) => {
+                const nextTask = projectWindow.nextTask;
+
+                return (
+                  <div key={projectWindow.name} className="bg-[#181818] border border-[#232323] rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium truncate">{projectWindow.name}</p>
+                      <span className="text-xs text-gray-500">
+                        {projectWindow.total} issues
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {projectWindow.startDate} {'->'} {projectWindow.endDate}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
+                      <div className="bg-[#0F0F0F] rounded px-2 py-1">Done: {projectWindow.done}</div>
+                      <div className="bg-[#0F0F0F] rounded px-2 py-1">In Progress: {projectWindow.inProgress}</div>
+                      <div className="bg-[#0F0F0F] rounded px-2 py-1">
+                        Completion: {projectWindow.total > 0 ? Math.round((projectWindow.done / projectWindow.total) * 100) : 0}%
+                      </div>
+                    </div>
+                    {nextTask ? (
+                      <button
+                        onClick={() => openTask(nextTask._id)}
+                        className="mt-3 w-full text-left bg-[#0F0F0F] border border-[#232323] rounded px-3 py-2 text-sm hover:border-[#333] transition-colors flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate">{nextTask.title}</span>
+                        <span className="text-xs text-gray-500">{nextTask.dueDate}</span>
+                      </button>
+                    ) : null}
                   </div>
-                  {window.nextTask ? (
-                    <button
-                      onClick={() => openTask(window.nextTask._id)}
-                      className="mt-3 w-full text-left bg-[#0F0F0F] border border-[#232323] rounded px-3 py-2 text-sm hover:border-[#333] transition-colors flex items-center justify-between gap-2"
-                    >
-                      <span className="truncate">{window.nextTask.title}</span>
-                      <span className="text-xs text-gray-500">{window.nextTask.dueDate}</span>
-                    </button>
-                  ) : null}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

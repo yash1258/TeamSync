@@ -14,6 +14,7 @@ import {
   PlusCircle,
   Scale,
   Settings,
+  UserCog,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -73,6 +74,13 @@ const safeDueDate = (date: string) => {
   return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
 };
 
+const normalizeCycleTag = (value: string) => value.trim().toLowerCase();
+
+const replaceCycleTag = (tags: string[], nextCycle: string) => {
+  const cleaned = tags.filter((tag) => !tag.toLowerCase().startsWith('cycle:'));
+  return [...cleaned, `cycle:${normalizeCycleTag(nextCycle)}`];
+};
+
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
   const { openTask } = useTaskModal();
@@ -85,6 +93,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const rawTasks = useQuery(api.tasks.listTeam);
   const rawDocuments = useQuery(api.documents.list, {});
+  const rawTeamMembers = useQuery(api.teamMembers.list);
+  const currentMember = useQuery(api.teamMembers.getCurrentMember);
   const updateTaskStatus = useMutation(api.tasks.updateStatus);
   const updateTask = useMutation(api.tasks.update);
 
@@ -111,6 +121,19 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const routes = publicFeatureFlags.planningHub ? [...planningRoutes, ...baseRoutes] : baseRoutes;
   const issueActionCandidates = tasks.filter((task) => task.status !== 'done').slice(0, 4);
+  const assignTargets = useMemo(() => {
+    const members = rawTeamMembers ?? [];
+    if (members.length === 0) return [];
+
+    const me = currentMember?._id;
+    const sorted = members.slice().sort((left, right) => {
+      if (left._id === me) return -1;
+      if (right._id === me) return 1;
+      return left.name.localeCompare(right.name);
+    });
+
+    return sorted.slice(0, 4);
+  }, [currentMember?._id, rawTeamMembers]);
 
   const closeThen = useCallback((action: () => void) => {
     onOpenChange(false);
@@ -135,71 +158,121 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: ListChecks,
       run: () => closeThen(() => router.push('/planning')),
     },
-      {
-        id: 'create-decision',
-        group: 'Quick Actions',
-        label: 'Create Decision (Docs)',
-        value: 'create decision adr docs',
-        icon: Scale,
-        run: () => closeThen(() => router.push('/docs')),
-      },
-      ...issueActionCandidates.flatMap((task) => {
-        const statusActions: PaletteItem[] = [];
+    {
+      id: 'create-decision',
+      group: 'Quick Actions',
+      label: 'Create Decision (Docs)',
+      value: 'create decision adr docs',
+      icon: Scale,
+      run: () => closeThen(() => router.push('/docs')),
+    },
+    ...issueActionCandidates.flatMap((task) => {
+      const issueActions: PaletteItem[] = [];
 
-        if (task.status !== 'in-progress') {
-          statusActions.push({
-            id: `start-${task._id}`,
-            group: 'Issue Actions',
-            label: `Start: ${task.title}`,
-            value: `start issue in progress ${task.title}`,
-            icon: ListChecks,
-            run: () =>
-              closeThen(() => {
-                void updateTaskStatus({
-                  id: task._id,
-                  status: 'in-progress',
-                }).catch((error) => console.error('Failed to move task to in-progress', error));
-              }),
-          });
-        }
+      if (task.status !== 'in-progress') {
+        issueActions.push({
+          id: `start-${task._id}`,
+          group: 'Issue Actions',
+          label: `Start: ${task.title}`,
+          value: `start issue in progress ${task.title}`,
+          icon: ListChecks,
+          run: () =>
+            closeThen(() => {
+              void updateTaskStatus({
+                id: task._id,
+                status: 'in-progress',
+              }).catch((error) => console.error('Failed to move task to in-progress', error));
+            }),
+        });
+      }
 
-        if (task.status !== 'done') {
-          statusActions.push({
-            id: `complete-${task._id}`,
-            group: 'Issue Actions',
-            label: `Mark Done: ${task.title}`,
-            value: `mark done complete issue ${task.title}`,
-            icon: ListChecks,
-            run: () =>
-              closeThen(() => {
-                void updateTaskStatus({
-                  id: task._id,
-                  status: 'done',
-                }).catch((error) => console.error('Failed to mark task done', error));
-              }),
-          });
-        }
+      if (task.status !== 'done') {
+        issueActions.push({
+          id: `complete-${task._id}`,
+          group: 'Issue Actions',
+          label: `Mark Done: ${task.title}`,
+          value: `mark done complete issue ${task.title}`,
+          icon: ListChecks,
+          run: () =>
+            closeThen(() => {
+              void updateTaskStatus({
+                id: task._id,
+                status: 'done',
+              }).catch((error) => console.error('Failed to mark task done', error));
+            }),
+        });
+      }
 
-        if (task.priority !== 'high') {
-          statusActions.push({
-            id: `priority-high-${task._id}`,
-            group: 'Issue Actions',
-            label: `Set High Priority: ${task.title}`,
-            value: `set high priority issue ${task.title}`,
-            icon: PlusCircle,
-            run: () =>
-              closeThen(() => {
-                void updateTask({
-                  id: task._id,
-                  priority: 'high',
-                }).catch((error) => console.error('Failed to update task priority', error));
-              }),
-          });
-        }
+      if (task.priority !== 'high') {
+        issueActions.push({
+          id: `priority-high-${task._id}`,
+          group: 'Issue Actions',
+          label: `Set High Priority: ${task.title}`,
+          value: `set high priority issue ${task.title}`,
+          icon: PlusCircle,
+          run: () =>
+            closeThen(() => {
+              void updateTask({
+                id: task._id,
+                priority: 'high',
+              }).catch((error) => console.error('Failed to update task priority', error));
+            }),
+        });
+      }
 
-        return statusActions;
-      }),
-      ...routes.map((route) => ({
+      for (const member of assignTargets) {
+        if (member._id === task.assigneeId) continue;
+        issueActions.push({
+          id: `assign-${task._id}-${member._id}`,
+          group: 'Issue Actions',
+          label: `Assign: ${task.title} -> ${member.name}`,
+          value: `assign issue owner teammate ${task.title} ${member.name}`,
+          icon: UserCog,
+          run: () =>
+            closeThen(() => {
+              void updateTask({
+                id: task._id,
+                assigneeId: member._id,
+              }).catch((error) => console.error('Failed to reassign task', error));
+            }),
+        });
+      }
+
+      if (publicFeatureFlags.planningHub) {
+        issueActions.push({
+          id: `cycle-current-${task._id}`,
+          group: 'Issue Actions',
+          label: `Move To Current Cycle: ${task.title}`,
+          value: `move cycle current issue ${task.title}`,
+          icon: Milestone,
+          run: () =>
+            closeThen(() => {
+              void updateTask({
+                id: task._id,
+                tags: replaceCycleTag(task.tags, 'current'),
+              }).catch((error) => console.error('Failed to move task to current cycle', error));
+            }),
+        });
+
+        issueActions.push({
+          id: `cycle-next-${task._id}`,
+          group: 'Issue Actions',
+          label: `Move To Next Cycle: ${task.title}`,
+          value: `move cycle next issue ${task.title}`,
+          icon: Milestone,
+          run: () =>
+            closeThen(() => {
+              void updateTask({
+                id: task._id,
+                tags: replaceCycleTag(task.tags, 'next'),
+              }).catch((error) => console.error('Failed to move task to next cycle', error));
+            }),
+        });
+      }
+
+      return issueActions;
+    }),
+    ...routes.map((route) => ({
       id: `route-${route.href}`,
       group: 'Navigate' as const,
       label: route.label,

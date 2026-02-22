@@ -154,7 +154,7 @@ Files:
 
 Tasks:
 - global command palette (`Cmd/Ctrl+K`) ✅
-- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision + fast status/priority actions for surfaced issues done; cycle/assignment flows pending)
+- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision + fast status/priority + assignment + cycle move commands for surfaced issues done; project/cycle entity-native commands pending)
 - fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
 - keyboard shortcuts for common issue actions (palette navigation + enter-to-run done; additional direct global shortcuts pending)
 
@@ -324,7 +324,17 @@ npx convex dev
 npx convex deploy --yes
 ```
 
-## 9) Risks and Mitigations
+## 9) Progress Log
+
+- 2026-02-22: `44db801` shipped Planning Hub route and collaboration master roadmap.
+- 2026-02-22: `b399ccc` added planning rollout flags and Phase 0 migration conventions.
+- 2026-02-22: `9783c61` added Phase 1 collaboration schema modules (`initiatives/projects/cycles/issues/decisions`).
+- 2026-02-22: `ab0864d` added Phase 2 planning routes and views (`projects`, `roadmap`, `decisions`) with route gating.
+- 2026-02-22: `940f557` added Phase 3 command palette foundation (`Cmd/Ctrl+K`, navigation, issue/decision search).
+- 2026-02-22: `b980c83` added issue status/priority action commands in the palette.
+- 2026-02-22: added assignment and cycle-move commands in the command palette (cycle tags: `cycle:current`/`cycle:next`).
+
+## 10) Risks and Mitigations
 
 - Risk: schema sprawl and query slowdowns.
   - Mitigation: strict index reviews at each phase gate.
@@ -341,7 +351,7 @@ npx convex deploy --yes
 - Risk: hidden permission regressions.
   - Mitigation: preserve server-side checks as source of truth and test mutations directly.
 
-## 10) Migration and Naming Conventions
+## 11) Migration and Naming Conventions
 
 These conventions are the Phase 0 source of truth.
 

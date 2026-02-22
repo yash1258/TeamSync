@@ -1,10 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Link2, X, Trash2, ArrowRight } from 'lucide-react';
+import { Loader2, Link2, X, Trash2, ArrowRight, Plus } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
+import { useTaskModal } from '@/components/TaskModalContext';
+import {
+  buildIssueTag,
+  buildProjectTagFromName,
+  hasIssueTag,
+  mergeUniqueTags,
+} from '@/lib/entityTags';
 
 type IssueStatus = 'backlog' | 'todo' | 'in-progress' | 'review' | 'done' | 'canceled';
 type IssuePriority = 'low' | 'medium' | 'high';
@@ -22,6 +29,18 @@ interface PlanningIssue {
   assigneeName?: string | null;
   dueDate?: string;
   updatedAt: number;
+}
+
+interface TeamTask {
+  _id: Id<'tasks'>;
+  title: string;
+  status: 'todo' | 'in-progress' | 'review' | 'done';
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string;
+  tags: string[];
+  assignee?: {
+    name?: string;
+  } | null;
 }
 
 interface IssueRelation {
@@ -61,24 +80,49 @@ const statusClass: Record<IssueStatus, string> = {
   canceled: 'text-red-300 bg-red-500/10 border border-red-500/20',
 };
 
+const taskStatusClass: Record<TeamTask['status'], string> = {
+  todo: 'text-gray-300 bg-gray-500/10 border border-gray-500/20',
+  'in-progress': 'text-blue-400 bg-blue-500/10 border border-blue-500/20',
+  review: 'text-amber-300 bg-amber-500/10 border border-amber-500/20',
+  done: 'text-green-400 bg-green-500/10 border border-green-500/20',
+};
+
+const todayIso = () => new Date().toISOString().split('T')[0];
+
 export function IssueDetailDrawer({ issueId, onClose }: IssueDetailDrawerProps) {
+  const { openTask } = useTaskModal();
   const issue = useQuery(api.issues.getById, { id: issueId }) as PlanningIssue | null | undefined;
   const rawIssues = useQuery(api.issues.list, {});
   const rawRelations = useQuery(api.issueRelations.listForIssue, { issueId });
+  const rawTeamTasks = useQuery(api.tasks.listTeam);
+  const rawTeamMembers = useQuery(api.teamMembers.list);
+  const currentMember = useQuery(api.teamMembers.getCurrentMember);
 
   const createRelation = useMutation(api.issueRelations.create);
   const removeRelation = useMutation(api.issueRelations.remove);
   const updateIssue = useMutation(api.issues.update);
+  const createTask = useMutation(api.tasks.create);
+  const updateTask = useMutation(api.tasks.update);
 
   const [relationTypeDraft, setRelationTypeDraft] = useState<IssueRelationType>('depends_on');
   const [targetIssueIdDraft, setTargetIssueIdDraft] = useState<string>('');
   const [isCreatingRelation, setIsCreatingRelation] = useState(false);
   const [isUpdatingIssue, setIsUpdatingIssue] = useState(false);
+  const [isLinkingTask, setIsLinkingTask] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [removingRelationId, setRemovingRelationId] = useState<Id<'issueRelations'> | null>(null);
   const [relationError, setRelationError] = useState<string | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [statusDraft, setStatusDraft] = useState<IssueStatus>('backlog');
   const [priorityDraft, setPriorityDraft] = useState<IssuePriority>('medium');
+  const [linkTaskIdDraft, setLinkTaskIdDraft] = useState<string>('');
+  const [taskDraft, setTaskDraft] = useState({
+    title: '',
+    priority: 'medium' as TeamTask['priority'],
+    dueDate: todayIso(),
+    assigneeId: '',
+  });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -102,6 +146,14 @@ export function IssueDetailDrawer({ issueId, onClose }: IssueDetailDrawerProps) 
 
   const issues = useMemo(() => (rawIssues ?? []) as PlanningIssue[], [rawIssues]);
   const relations = useMemo(() => (rawRelations ?? []) as IssueRelation[], [rawRelations]);
+  const teamTasks = useMemo(() => (rawTeamTasks ?? []) as TeamTask[], [rawTeamTasks]);
+  const teamMembers = useMemo(() => rawTeamMembers ?? [], [rawTeamMembers]);
+
+  const issueTag = useMemo(() => buildIssueTag(issueId), [issueId]);
+  const projectTag = useMemo(
+    () => (issue?.projectTitle ? buildProjectTagFromName(issue.projectTitle) : null),
+    [issue?.projectTitle]
+  );
 
   const relationTargets = useMemo(
     () =>
@@ -117,10 +169,49 @@ export function IssueDetailDrawer({ issueId, onClose }: IssueDetailDrawerProps) 
     }
   }, [targetIssueIdDraft, relationTargets]);
 
+  useEffect(() => {
+    if (taskDraft.assigneeId || teamMembers.length === 0) return;
+    const preferredAssigneeId = currentMember?._id ?? teamMembers[0]?._id ?? '';
+    if (!preferredAssigneeId) return;
+    setTaskDraft((current) => ({ ...current, assigneeId: preferredAssigneeId }));
+  }, [currentMember?._id, taskDraft.assigneeId, teamMembers]);
+
+  useEffect(() => {
+    if (!issue) return;
+    setTaskDraft((current) => ({
+      ...current,
+      title: current.title || `${issue.title} execution`,
+      dueDate: issue.dueDate || current.dueDate || todayIso(),
+    }));
+  }, [issue]);
+
   const sortedRelations = useMemo(
     () => relations.slice().sort((left, right) => right.createdAt - left.createdAt),
     [relations]
   );
+
+  const linkedTasks = useMemo(
+    () =>
+      teamTasks
+        .filter((task) => hasIssueTag(task.tags, issueId))
+        .sort((left, right) => left.dueDate.localeCompare(right.dueDate)),
+    [issueId, teamTasks]
+  );
+
+  const linkableTasks = useMemo(
+    () =>
+      teamTasks
+        .filter((task) => !hasIssueTag(task.tags, issueId))
+        .sort((left, right) => left.dueDate.localeCompare(right.dueDate))
+        .slice(0, 40),
+    [issueId, teamTasks]
+  );
+
+  useEffect(() => {
+    if (!linkTaskIdDraft && linkableTasks.length > 0) {
+      setLinkTaskIdDraft(linkableTasks[0]._id);
+    }
+  }, [linkTaskIdDraft, linkableTasks]);
 
   const handleCreateRelation = async () => {
     if (!targetIssueIdDraft) {
@@ -171,6 +262,76 @@ export function IssueDetailDrawer({ issueId, onClose }: IssueDetailDrawerProps) 
       setUpdateError(error instanceof Error ? error.message : 'Failed to update issue.');
     } finally {
       setIsUpdatingIssue(false);
+    }
+  };
+
+  const handleLinkTask = async () => {
+    if (!linkTaskIdDraft) {
+      setTaskError('Select a task to link.');
+      return;
+    }
+
+    const targetTask = teamTasks.find((task) => task._id === linkTaskIdDraft);
+    if (!targetTask) {
+      setTaskError('Task not found.');
+      return;
+    }
+
+    setTaskError(null);
+    setIsLinkingTask(true);
+    try {
+      await updateTask({
+        id: targetTask._id,
+        tags: mergeUniqueTags(
+          targetTask.tags,
+          [issueTag],
+          projectTag ? [projectTag] : []
+        ),
+      });
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : 'Failed to link task to issue.');
+    } finally {
+      setIsLinkingTask(false);
+    }
+  };
+
+  const handleCreateTask = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const title = taskDraft.title.trim();
+    if (!title) {
+      setTaskError('Task title is required.');
+      return;
+    }
+    if (!currentMember?._id) {
+      setTaskError('Join the team before creating tasks.');
+      return;
+    }
+
+    setTaskError(null);
+    setIsCreatingTask(true);
+    try {
+      const taskId = await createTask({
+        title,
+        description: issue
+          ? `Execution task linked to issue: ${issue.title}`
+          : 'Execution task linked to native issue',
+        status: 'todo',
+        priority: taskDraft.priority,
+        visibility: 'team',
+        ownerId: currentMember._id,
+        assigneeId: (taskDraft.assigneeId || currentMember._id) as Id<'teamMembers'>,
+        dueDate: taskDraft.dueDate || issue?.dueDate || todayIso(),
+        tags: mergeUniqueTags([issueTag], projectTag ? [projectTag] : []),
+      });
+      setTaskDraft((current) => ({
+        ...current,
+        title: issue ? `${issue.title} follow-up` : '',
+      }));
+      openTask(taskId);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : 'Failed to create task.');
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
@@ -286,6 +447,148 @@ export function IssueDetailDrawer({ issueId, onClose }: IssueDetailDrawerProps) 
                 </div>
               </div>
               {updateError ? <p className="text-xs text-red-400">{updateError}</p> : null}
+            </section>
+
+            <section className="rounded-xl border border-[#232323] bg-[#101010] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="font-medium text-sm">Linked Tasks ({linkedTasks.length})</h3>
+                <span className="text-[11px] px-2 py-1 rounded border border-[#2A2A2A] bg-[#141414] text-gray-400">
+                  {issueTag}
+                </span>
+              </div>
+
+              {linkedTasks.length === 0 ? (
+                <p className="text-sm text-gray-500">No tasks linked to this issue yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {linkedTasks.slice(0, 8).map((task) => (
+                    <button
+                      key={task._id}
+                      onClick={() => openTask(task._id)}
+                      className="w-full text-left rounded-lg border border-[#232323] bg-[#151515] px-3 py-2 hover:border-[#333] transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm truncate">{task.title}</p>
+                        <span className={`text-[10px] px-2 py-1 rounded ${priorityClass[task.priority]}`}>
+                          {task.priority}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded ${taskStatusClass[task.status]}`}>
+                          {task.status}
+                        </span>
+                        <span>Due {task.dueDate}</span>
+                        {task.assignee?.name ? (
+                          <>
+                            <span>•</span>
+                            <span>{task.assignee.name}</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                <select
+                  value={linkTaskIdDraft}
+                  onChange={(event) => setLinkTaskIdDraft(event.target.value)}
+                  className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                >
+                  {linkableTasks.length === 0 ? (
+                    <option value="">No unlinked tasks available</option>
+                  ) : (
+                    linkableTasks.map((task) => (
+                      <option key={task._id} value={task._id}>
+                        {task.title}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <button
+                  onClick={() => void handleLinkTask()}
+                  disabled={isLinkingTask || linkableTasks.length === 0}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[#181818] border border-[#2A2A2A] text-sm hover:border-[#3A3A3A] disabled:opacity-60"
+                >
+                  {isLinkingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                  Link Task
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateTask} className="space-y-3 pt-2 border-t border-[#232323]">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wide text-gray-500 mb-1">Create Task</label>
+                  <input
+                    value={taskDraft.title}
+                    onChange={(event) =>
+                      setTaskDraft((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Create execution task for this issue"
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm placeholder:text-gray-500 focus:outline-none focus:border-[#F0FF7A]"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <select
+                    value={taskDraft.priority}
+                    onChange={(event) =>
+                      setTaskDraft((current) => ({
+                        ...current,
+                        priority: event.target.value as TeamTask['priority'],
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={taskDraft.dueDate}
+                    onChange={(event) =>
+                      setTaskDraft((current) => ({
+                        ...current,
+                        dueDate: event.target.value,
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  />
+                  <select
+                    value={taskDraft.assigneeId}
+                    onChange={(event) =>
+                      setTaskDraft((current) => ({
+                        ...current,
+                        assigneeId: event.target.value,
+                      }))
+                    }
+                    className="w-full bg-[#181818] border border-[#232323] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#F0FF7A]"
+                  >
+                    {teamMembers.length === 0 ? (
+                      <option value="">No team members found</option>
+                    ) : (
+                      teamMembers.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isCreatingTask}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F0FF7A] text-[#010101] text-sm font-medium disabled:opacity-60"
+                >
+                  {isCreatingTask ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Create Linked Task
+                </button>
+              </form>
+
+              {taskError ? <p className="text-xs text-red-400">{taskError}</p> : null}
             </section>
 
             <section className="rounded-xl border border-[#232323] bg-[#101010] p-4 space-y-3">

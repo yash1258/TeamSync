@@ -194,7 +194,7 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
-- `sections/PlanningView.tsx` (task triage + native issue relation drawer)
+- `sections/PlanningView.tsx` (task triage + native issue relation drawer + linked task controls)
 - `sections/ProjectsView.tsx` (hybrid: `projects` table records + task tags)
 - `sections/RoadmapView.tsx` (currently derived from `tasks` + milestones)
 - `sections/DecisionsView.tsx` (currently derived from documents + versions)
@@ -325,9 +325,10 @@ Convex auth tables are included via `authTables`.
 
 6. Planning Phase 2 uses temporary derived data:
    - `PlanningView` now includes a native issue lane (`issues` table) with an issue detail drawer for relation management (`issueRelations`)
+   - issue detail drawer now also supports task linkage: create linked tasks or attach existing tasks via `issue:<id>` tags
    - native issue creation/editing in Planning is separate from legacy task creation (`tasks`)
    - `ProjectsView` now reads `projects` plus task tags (`project:*`) and includes in-app project creation
-   - project creation currently auto-links execution via optional kickoff task tags (`project:<slug>`)
+   - project creation can now create a native kickoff issue and a linked kickoff task (`project:<slug>` + `issue:<id>`)
    - `RoadmapView` is still sourced from `tasks` + milestone conventions
    - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
    - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`

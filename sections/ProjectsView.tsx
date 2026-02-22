@@ -19,6 +19,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { useTaskModal } from '@/components/TaskModalContext';
 import type { Id } from '@/convex/_generated/dataModel';
+import { buildIssueTag, buildProjectTagFromName, extractProjectNameFromTag, extractProjectTag } from '@/lib/entityTags';
 
 type ViewMode = 'overview' | 'list' | 'timeline';
 type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done';
@@ -40,9 +41,12 @@ interface ProjectSummary {
   inProgress: number;
   overdue: number;
   highOpen: number;
+  issueTotal: number;
+  issueDone: number;
   health: 'green' | 'yellow' | 'red';
   status?: 'planned' | 'active' | 'on-hold' | 'done' | 'archived';
   origin: 'tasks' | 'planning' | 'hybrid';
+  planningProjectId?: Id<'projects'>;
 }
 
 interface PlanningProject {
@@ -54,11 +58,14 @@ interface PlanningProject {
   targetDate?: string;
 }
 
+interface PlanningIssue {
+  _id: Id<'issues'>;
+  projectId?: Id<'projects'>;
+  status: 'backlog' | 'todo' | 'in-progress' | 'review' | 'done' | 'canceled';
+}
+
 const getProjectName = (tags: string[]) => {
-  const value = tags.find((tag) => tag.toLowerCase().startsWith('project:'));
-  if (!value) return 'Unscoped';
-  const projectName = value.split(':').slice(1).join(':').trim();
-  return projectName || 'Unscoped';
+  return extractProjectNameFromTag(extractProjectTag(tags)) || 'Unscoped';
 };
 
 const safeDate = (isoDate: string) => {
@@ -70,8 +77,6 @@ const todayIso = () => new Date().toISOString().split('T')[0];
 
 const normalizeProjectKey = (value: string) =>
   value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-const projectTagFromName = (value: string) => normalizeProjectKey(value) || 'untitled-project';
 
 const mapPlanningHealth = (
   health: PlanningProject['health'],
@@ -97,9 +102,11 @@ export function ProjectsView() {
 
   const rawTeamTasks = useQuery(api.tasks.listTeam);
   const rawPlanningProjects = useQuery(api.projects.list, {});
+  const rawPlanningIssues = useQuery(api.issues.list, {});
   const currentMember = useQuery(api.teamMembers.getCurrentMember);
 
   const createProject = useMutation(api.projects.create);
+  const createIssue = useMutation(api.issues.create);
   const createTask = useMutation(api.tasks.create);
 
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
@@ -112,7 +119,8 @@ export function ProjectsView() {
     summary: '',
     startDate: '',
     targetDate: '',
-    createKickoffIssue: true,
+    createNativeIssue: true,
+    createKickoffTask: true,
   });
 
   useEffect(() => {
@@ -136,10 +144,25 @@ export function ProjectsView() {
     () => (rawPlanningProjects ?? []) as PlanningProject[],
     [rawPlanningProjects]
   );
+  const planningIssues = useMemo(
+    () => (rawPlanningIssues ?? []) as PlanningIssue[],
+    [rawPlanningIssues]
+  );
 
   const today = todayIso();
 
   const projects = useMemo(() => {
+    const issuesByProjectId = new Map<Id<'projects'>, { total: number; done: number }>();
+    for (const issue of planningIssues) {
+      if (!issue.projectId) continue;
+      const bucket = issuesByProjectId.get(issue.projectId) ?? { total: 0, done: 0 };
+      bucket.total += 1;
+      if (issue.status === 'done') {
+        bucket.done += 1;
+      }
+      issuesByProjectId.set(issue.projectId, bucket);
+    }
+
     const taskBuckets = new Map<string, { name: string; tasks: ProjectTask[] }>();
 
     for (const task of teamTasks) {
@@ -189,6 +212,8 @@ export function ProjectsView() {
         inProgress,
         overdue,
         highOpen,
+        issueTotal: 0,
+        issueDone: 0,
         health,
         origin: 'tasks',
       });
@@ -197,13 +222,17 @@ export function ProjectsView() {
     for (const project of planningProjects) {
       const key = normalizeProjectKey(project.title);
       const existing = summariesByKey.get(key);
+      const issueStats = issuesByProjectId.get(project._id) ?? { total: 0, done: 0 };
 
       if (existing) {
         summariesByKey.set(key, {
           ...existing,
           name: project.title,
           status: project.status,
+          issueTotal: issueStats.total,
+          issueDone: issueStats.done,
           origin: 'hybrid',
+          planningProjectId: project._id,
         });
         continue;
       }
@@ -217,9 +246,12 @@ export function ProjectsView() {
         inProgress: 0,
         overdue: 0,
         highOpen: 0,
+        issueTotal: issueStats.total,
+        issueDone: issueStats.done,
         health: mapPlanningHealth(project.health, project.status),
         status: project.status,
         origin: 'planning',
+        planningProjectId: project._id,
       });
     }
 
@@ -227,7 +259,7 @@ export function ProjectsView() {
       if (right.total !== left.total) return right.total - left.total;
       return left.name.localeCompare(right.name);
     });
-  }, [planningProjects, teamTasks, today]);
+  }, [planningIssues, planningProjects, teamTasks, today]);
 
   const projectOptions = useMemo(
     () => ['all', ...Array.from(new Set(projects.map((project) => project.name)))],
@@ -267,7 +299,7 @@ export function ProjectsView() {
     setCreateProjectError(null);
 
     try {
-      await createProject({
+      const projectId = await createProject({
         title,
         summary: projectDraft.summary.trim() || undefined,
         status: 'planned',
@@ -277,9 +309,30 @@ export function ProjectsView() {
         targetDate: projectDraft.targetDate || undefined,
       });
 
-      if (projectDraft.createKickoffIssue) {
+      let createdIssueId: Id<'issues'> | null = null;
+
+      if (projectDraft.createNativeIssue) {
         if (!currentMember?._id) {
-          throw new Error('Join the team before creating kickoff issues.');
+          throw new Error('Join the team before creating native issues.');
+        }
+
+        createdIssueId = await createIssue({
+          title: `${title} kickoff`,
+          description:
+            projectDraft.summary.trim() ||
+            `Kickoff scope, sequencing, and delivery plan for ${title}.`,
+          projectId,
+          status: 'backlog',
+          priority: 'medium',
+          dueDate: projectDraft.targetDate || undefined,
+          ownerId: currentMember._id,
+          assigneeId: currentMember._id,
+        });
+      }
+
+      if (projectDraft.createKickoffTask) {
+        if (!currentMember?._id) {
+          throw new Error('Join the team before creating kickoff tasks.');
         }
 
         await createTask({
@@ -293,7 +346,10 @@ export function ProjectsView() {
           ownerId: currentMember._id,
           assigneeId: currentMember._id,
           dueDate: projectDraft.targetDate || todayIso(),
-          tags: [`project:${projectTagFromName(title)}`],
+          tags: [
+            buildProjectTagFromName(title),
+            ...(createdIssueId ? [buildIssueTag(createdIssueId)] : []),
+          ],
         });
       }
 
@@ -304,7 +360,8 @@ export function ProjectsView() {
         summary: '',
         startDate: '',
         targetDate: '',
-        createKickoffIssue: true,
+        createNativeIssue: true,
+        createKickoffTask: true,
       });
     } catch (error) {
       setCreateProjectError(
@@ -318,6 +375,7 @@ export function ProjectsView() {
   if (
     rawTeamTasks === undefined ||
     rawPlanningProjects === undefined ||
+    rawPlanningIssues === undefined ||
     currentMember === undefined
   ) {
     return (
@@ -424,7 +482,7 @@ export function ProjectsView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="grid grid-cols-5 gap-2 text-xs">
                   <div className="bg-[#181818] rounded p-2">
                     <p className="text-gray-500">Total</p>
                     <p className="font-medium mt-1">{project.total}</p>
@@ -440,6 +498,12 @@ export function ProjectsView() {
                   <div className="bg-[#181818] rounded p-2">
                     <p className="text-gray-500">Overdue</p>
                     <p className={`font-medium mt-1 ${project.overdue > 0 ? 'text-red-400' : ''}`}>{project.overdue}</p>
+                  </div>
+                  <div className="bg-[#181818] rounded p-2">
+                    <p className="text-gray-500">Issues</p>
+                    <p className="font-medium mt-1">
+                      {project.issueDone}/{project.issueTotal}
+                    </p>
                   </div>
                 </div>
 
@@ -477,7 +541,10 @@ export function ProjectsView() {
               <div key={project.key} className="grid grid-cols-12 gap-3 px-4 py-3 border-b border-[#181818] text-sm items-center">
                 <div className="col-span-4 min-w-0">
                   <p className="font-medium truncate">{project.name}</p>
-                  {project.status ? <p className="text-xs text-gray-500 mt-0.5">{project.status}</p> : null}
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {project.status ? `${project.status} • ` : ''}
+                    issues {project.issueDone}/{project.issueTotal}
+                  </p>
                 </div>
                 <div className="col-span-2">{project.total}</div>
                 <div className="col-span-2">{project.done}</div>
@@ -544,7 +611,9 @@ export function ProjectsView() {
             <div className="px-5 py-4 border-b border-[#232323] flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Make New Project</h2>
-                <p className="text-xs text-gray-500 mt-1">Create a project record and optional kickoff issue.</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Create a connected project with optional kickoff issue and kickoff task.
+                </p>
               </div>
               <button
                 onClick={closeCreateProjectModal}
@@ -609,19 +678,36 @@ export function ProjectsView() {
               <label className="flex items-start gap-3 text-sm">
                 <input
                   type="checkbox"
-                  checked={projectDraft.createKickoffIssue}
+                  checked={projectDraft.createNativeIssue}
                   onChange={(event) =>
                     setProjectDraft((current) => ({
                       ...current,
-                      createKickoffIssue: event.target.checked,
+                      createNativeIssue: event.target.checked,
                     }))
                   }
                   className="mt-0.5 rounded border-[#2C2C2C] bg-[#181818]"
                 />
                 <span className="text-gray-400">
-                  Auto-create kickoff issue with tag
-                  <code className="mx-1 text-[#F0FF7A]">project:{projectTagFromName(projectDraft.title || 'your-project')}</code>
-                  so this project appears in task-based views.
+                  Auto-create a native kickoff issue in the planning graph.
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={projectDraft.createKickoffTask}
+                  onChange={(event) =>
+                    setProjectDraft((current) => ({
+                      ...current,
+                      createKickoffTask: event.target.checked,
+                    }))
+                  }
+                  className="mt-0.5 rounded border-[#2C2C2C] bg-[#181818]"
+                />
+                <span className="text-gray-400">
+                  Auto-create a kickoff task tagged with
+                  <code className="mx-1 text-[#F0FF7A]">{buildProjectTagFromName(projectDraft.title || 'your-project')}</code>
+                  and linked issue tag when a native issue is created.
                 </span>
               </label>
 

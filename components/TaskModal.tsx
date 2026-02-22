@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, MessageSquare, Calendar, Flag, User, Tag, Send, Trash2, Edit2, Save, Loader2 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { issueShortcutDefinitions } from '@/lib/shortcuts';
+import { extractIssueIds } from '@/lib/entityTags';
 
 interface TaskModalProps {
     taskId: Id<'tasks'>;
@@ -29,11 +31,20 @@ interface TaskComment {
     author?: CommentAuthor | null;
 }
 
+interface NativeIssue {
+    _id: Id<'issues'>;
+    title: string;
+    status: 'backlog' | 'todo' | 'in-progress' | 'review' | 'done' | 'canceled';
+    priority: 'low' | 'medium' | 'high';
+}
+
 const splitShortcutCombo = (combo: string) => combo.split('+').map((part) => part.trim());
 
 export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
+    const router = useRouter();
     const modalRef = useRef<HTMLDivElement>(null);
     const task = useQuery(api.tasks.getById, { id: taskId });
+    const rawNativeIssues = useQuery(api.issues.list, {});
     const currentMember = useQuery(api.teamMembers.getCurrentMember);
     const updateTask = useMutation(api.tasks.update);
     const deleteTask = useMutation(api.tasks.remove);
@@ -57,6 +68,14 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
         assigneeId: '' as string,
         tags: '',
     });
+
+    const linkedNativeIssues = useMemo(() => {
+        if (!task) return [];
+        const nativeIssues = (rawNativeIssues ?? []) as NativeIssue[];
+        const linkedIssueIds = extractIssueIds(task.tags);
+        if (linkedIssueIds.length === 0) return [];
+        return nativeIssues.filter((issue) => linkedIssueIds.includes(issue._id));
+    }, [rawNativeIssues, task]);
 
     useEffect(() => {
         if (task) {
@@ -151,6 +170,11 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
         } finally {
             setIsMarkingComplete(false);
         }
+    };
+
+    const handleOpenNativeIssue = (issueId: Id<'issues'>) => {
+        onClose();
+        router.push(`/planning?issue=${issueId}`);
     };
 
     const getStatusColor = (status: string) => {
@@ -545,6 +569,33 @@ export function TaskModal({ taskId, onClose, onDeleted }: TaskModalProps) {
                                             </span>
                                         ))}
                                         {task.tags.length === 0 && <span className="text-sm text-gray-500">No tags</span>}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-400 mb-2">Linked Native Issues</h3>
+                                {linkedNativeIssues.length === 0 ? (
+                                    <p className="text-sm text-gray-500">No linked native issue tags.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {linkedNativeIssues.map((nativeIssue) => (
+                                            <button
+                                                key={nativeIssue._id}
+                                                onClick={() => handleOpenNativeIssue(nativeIssue._id)}
+                                                className="w-full text-left p-2.5 bg-[#181818] border border-[#232323] rounded-lg hover:border-[#333] transition-colors"
+                                            >
+                                                <p className="text-sm truncate">{nativeIssue.title}</p>
+                                                <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
+                                                    <span className={`px-1.5 py-0.5 rounded ${getStatusColor(nativeIssue.status)}`}>
+                                                        {getStatusLabel(nativeIssue.status)}
+                                                    </span>
+                                                    <span className={getPriorityColor(nativeIssue.priority)}>
+                                                        {nativeIssue.priority}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
                             </div>

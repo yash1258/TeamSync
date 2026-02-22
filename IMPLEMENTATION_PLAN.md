@@ -351,6 +351,7 @@ npx convex deploy --yes
 - 2026-02-22: added project creation entrypoints from Planning Hub and command palette (`Create Project` -> `/projects?create=1`).
 - 2026-02-22: added native issue collaboration panel in Planning Hub with in-app native issue creation and relation drawer (add/remove issue links + quick status/priority updates).
 - 2026-02-22: added native issue command palette actions (create native issue route, open native issue drawer, native status updates, and quick dependency-link commands).
+- 2026-02-22: connected `project -> issue -> task` flow (project creation can create native kickoff issue + linked kickoff task; issue drawer can link/create tasks; task modal deep-links back to native issues).
 
 ## 10) Risks and Mitigations
 
@@ -390,3 +391,47 @@ ID/reference patterns:
 - never pass client-trusted identity for ownership/audit; resolve from auth on server
 - log activity for key state transitions in planning modules
 - indexes are required for list queries that power dashboard/planning landing views
+
+## 12) Completion Backlog (Post-Audit)
+
+This is the audited finish checklist for a Linear-style connected product model.
+
+### A. Connectivity Backbone
+
+Status: `IN PROGRESS`
+
+- ship stable linkage for `projects -> issues -> tasks` across create/edit/detail flows ✅
+- add issue-linked task backfill utility for legacy tasks (tag enrichment + conflict report)
+- add project-level rollups combining native issue state + linked task state
+
+### B. Native Issue Experience
+
+Status: `IN PROGRESS`
+
+- issue detail drawer with relation CRUD, quick state updates, and linked task creation/linking ✅
+- add richer issue filters (project, cycle, assignee, status) in Planning Hub
+- add batch operations (assign, move status, cycle) for selected native issues
+
+### C. Planning Surfaces Consistency
+
+Status: `PLANNED`
+
+- rewire `RoadmapView` to native `projects/issues/cycles` first, task tags second
+- normalize labels and counts so “issue” always refers to native `issues`, not legacy `tasks`
+- unify status chips and health logic across Planning, Projects, Roadmap
+
+### D. Decisions and Evidence Chain
+
+Status: `PLANNED`
+
+- blend `decisions` table into `DecisionsView` (not docs-only inference)
+- add explicit links from decision -> project -> native issues -> linked tasks
+- show evidence pointers (docs/sources) in decision detail
+
+### E. Quality and Hardening
+
+Status: `PLANNED`
+
+- add smoke tests for critical flows (create project, create issue, link task, create relation)
+- add regression checks for viewer/member/admin permission boundaries
+- remove remaining UI dead-ends and placeholder behaviors before release candidate

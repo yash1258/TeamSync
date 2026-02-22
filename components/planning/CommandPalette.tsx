@@ -6,8 +6,10 @@ import {
   Compass,
   FileText,
   FolderKanban,
+  GitBranchPlus,
   Kanban,
   LayoutDashboard,
+  Link2,
   ListChecks,
   Milestone,
   PlusCircle,
@@ -39,7 +41,13 @@ interface RouteCommand {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-type PaletteGroup = 'Quick Actions' | 'Issue Actions' | 'Navigate' | 'Issues' | 'Decisions';
+type PaletteGroup =
+  | 'Quick Actions'
+  | 'Issue Actions'
+  | 'Navigate'
+  | 'Issues'
+  | 'Native Issues'
+  | 'Decisions';
 
 interface PaletteItem {
   id: string;
@@ -67,7 +75,14 @@ const planningRoutes: RouteCommand[] = [
   { href: '/decisions', label: 'Decisions', keywords: 'adr architecture review', icon: Scale },
 ];
 
-const groupOrder: PaletteGroup[] = ['Quick Actions', 'Issue Actions', 'Navigate', 'Issues', 'Decisions'];
+const groupOrder: PaletteGroup[] = [
+  'Quick Actions',
+  'Issue Actions',
+  'Navigate',
+  'Issues',
+  'Native Issues',
+  'Decisions',
+];
 
 const safeDueDate = (date: string) => {
   const parsed = Date.parse(date);
@@ -94,11 +109,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const rawTasks = useQuery(api.tasks.listTeam);
+  const rawNativeIssues = useQuery(api.issues.list, {});
   const rawDocuments = useQuery(api.documents.list, {});
   const rawTeamMembers = useQuery(api.teamMembers.list);
   const currentMember = useQuery(api.teamMembers.getCurrentMember);
   const updateTaskStatus = useMutation(api.tasks.updateStatus);
   const updateTask = useMutation(api.tasks.update);
+  const updateNativeIssue = useMutation(api.issues.update);
+  const createIssueRelation = useMutation(api.issueRelations.create);
 
   const tasks = useMemo(
     () =>
@@ -121,8 +139,42 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     [rawDocuments]
   );
 
+  const nativeIssues = useMemo(
+    () =>
+      (rawNativeIssues ?? [])
+        .slice()
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .slice(0, 8),
+    [rawNativeIssues]
+  );
+
   const routes = publicFeatureFlags.planningHub ? [...planningRoutes, ...baseRoutes] : baseRoutes;
   const issueActionCandidates = tasks.filter((task) => task.status !== 'done').slice(0, 4);
+  const nativeIssueActionCandidates = nativeIssues
+    .filter((issue) => issue.status !== 'done' && issue.status !== 'canceled')
+    .slice(0, 3);
+  const dependencyActionPairs = useMemo(() => {
+    if (nativeIssueActionCandidates.length < 2) return [];
+    const pairs: Array<{
+      fromIssueId: (typeof nativeIssueActionCandidates)[number]['_id'];
+      toIssueId: (typeof nativeIssueActionCandidates)[number]['_id'];
+      fromTitle: string;
+      toTitle: string;
+    }> = [];
+
+    for (let index = 0; index < nativeIssueActionCandidates.length - 1; index += 1) {
+      const from = nativeIssueActionCandidates[index];
+      const to = nativeIssueActionCandidates[index + 1];
+      pairs.push({
+        fromIssueId: from._id,
+        toIssueId: to._id,
+        fromTitle: from.title,
+        toTitle: to.title,
+      });
+    }
+
+    return pairs;
+  }, [nativeIssueActionCandidates]);
   const assignTargets = useMemo(() => {
     const members = rawTeamMembers ?? [];
     if (members.length === 0) return [];
@@ -152,14 +204,34 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       icon: PlusCircle,
       run: () => closeThen(() => setShowAddTaskModal(true)),
     },
-    {
-      id: 'open-triage',
-      group: 'Quick Actions',
-      label: 'Open Triage Inbox',
-      value: 'open triage inbox planning',
-      icon: ListChecks,
-      run: () => closeThen(() => router.push('/planning')),
-    },
+    ...(publicFeatureFlags.planningHub
+      ? [
+          {
+            id: 'open-triage',
+            group: 'Quick Actions' as const,
+            label: 'Open Triage Inbox',
+            value: 'open triage inbox planning',
+            icon: ListChecks,
+            run: () => closeThen(() => router.push('/planning')),
+          },
+          {
+            id: 'create-project',
+            group: 'Quick Actions' as const,
+            label: 'Create Project',
+            value: 'create new project planning',
+            icon: FolderKanban,
+            run: () => closeThen(() => router.push('/projects?create=1')),
+          },
+          {
+            id: 'create-native-issue',
+            group: 'Quick Actions' as const,
+            label: 'Create Native Issue',
+            value: 'create native issue dependency planning relation',
+            icon: GitBranchPlus,
+            run: () => closeThen(() => router.push('/planning?createIssue=1')),
+          },
+        ]
+      : []),
     {
       id: 'create-decision',
       group: 'Quick Actions',
@@ -167,14 +239,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       value: 'create decision adr docs',
       icon: Scale,
       run: () => closeThen(() => router.push('/docs')),
-    },
-    {
-      id: 'create-project',
-      group: 'Quick Actions',
-      label: 'Create Project',
-      value: 'create new project planning',
-      icon: FolderKanban,
-      run: () => closeThen(() => router.push('/projects?create=1')),
     },
     ...issueActionCandidates.flatMap((task) => {
       const issueActions: PaletteItem[] = [];
@@ -282,6 +346,60 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
       return issueActions;
     }),
+    ...nativeIssueActionCandidates.flatMap((issue) => {
+      const issueActions: PaletteItem[] = [];
+
+      if (issue.status !== 'in-progress') {
+        issueActions.push({
+          id: `native-start-${issue._id}`,
+          group: 'Issue Actions',
+          label: `Start Native: ${issue.title}`,
+          value: `start native issue in progress ${issue.title}`,
+          icon: GitBranchPlus,
+          run: () =>
+            closeThen(() => {
+              void updateNativeIssue({
+                id: issue._id,
+                status: 'in-progress',
+              }).catch((error) => console.error('Failed to move native issue to in-progress', error));
+            }),
+        });
+      }
+
+      if (issue.status !== 'done') {
+        issueActions.push({
+          id: `native-done-${issue._id}`,
+          group: 'Issue Actions',
+          label: `Mark Native Done: ${issue.title}`,
+          value: `mark native issue done ${issue.title}`,
+          icon: GitBranchPlus,
+          run: () =>
+            closeThen(() => {
+              void updateNativeIssue({
+                id: issue._id,
+                status: 'done',
+              }).catch((error) => console.error('Failed to mark native issue done', error));
+            }),
+        });
+      }
+
+      return issueActions;
+    }),
+    ...dependencyActionPairs.map((pair) => ({
+      id: `native-dependency-${pair.fromIssueId}-${pair.toIssueId}`,
+      group: 'Issue Actions' as const,
+      label: `Link Dependency: ${pair.fromTitle} -> ${pair.toTitle}`,
+      value: `link dependency native issue ${pair.fromTitle} depends on ${pair.toTitle}`,
+      icon: Link2,
+      run: () =>
+        closeThen(() => {
+          void createIssueRelation({
+            fromIssueId: pair.fromIssueId,
+            toIssueId: pair.toIssueId,
+            relationType: 'depends_on',
+          }).catch((error) => console.error('Failed to link native issue dependency', error));
+        }),
+    })),
     ...routes.map((route) => ({
       id: `route-${route.href}`,
       group: 'Navigate' as const,
@@ -299,6 +417,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       shortcut: task.dueDate,
       run: () => closeThen(() => openTask(task._id)),
     })),
+    ...nativeIssues.map((issue) => ({
+      id: `native-issue-${issue._id}`,
+      group: 'Native Issues' as const,
+      label: issue.title,
+      value: `${issue.title} native issue ${issue.status} ${issue.priority} ${issue.projectTitle ?? ''} ${
+        issue.cycleName ?? ''
+      }`,
+      icon: GitBranchPlus,
+      shortcut: issue.status,
+      run: () => closeThen(() => router.push(`/planning?issue=${issue._id}`)),
+    })),
     ...decisionDocs.map((doc) => ({
       id: `decision-${doc._id}`,
       group: 'Decisions' as const,
@@ -310,9 +439,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     })),
   ];
 
-  const items = publicFeatureFlags.planningHub
-    ? baseItems
-    : baseItems.filter((item) => item.id !== 'open-triage');
+  const items = baseItems;
 
   const filteredItems = useMemo(() => {
     const needle = query.trim().toLowerCase();

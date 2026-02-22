@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { AddTaskModal } from '@/components/AddTaskModal';
 import { IssueDetailDrawer } from '@/components/planning/IssueDetailDrawer';
@@ -74,6 +74,8 @@ export function PlanningView() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const { openTask } = useTaskModal();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const currentMember = useQuery(api.teamMembers.getCurrentMember);
   const teamTasks = useQuery(api.tasks.listTeam);
@@ -103,11 +105,32 @@ export function PlanningView() {
     dueDate: '',
   });
 
+  const replacePlanningQuery = (nextParams: URLSearchParams) => {
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname);
+  };
+
   const resolvedTeamTasks = useMemo(() => teamTasks ?? [], [teamTasks]);
   const resolvedPersonalTasks = useMemo(() => personalTasks ?? [], [personalTasks]);
   const resolvedActivity = useMemo(() => activity ?? [], [activity]);
   const resolvedDocuments = useMemo(() => documents ?? [], [documents]);
   const resolvedNativeIssues = useMemo(() => (nativeIssues ?? []) as NativeIssue[], [nativeIssues]);
+
+  useEffect(() => {
+    if (searchParams.get('createIssue') === '1') {
+      setShowNativeIssueModal(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const issueParam = searchParams.get('issue');
+    if (!issueParam) return;
+
+    const matchingIssue = resolvedNativeIssues.find((issue) => issue._id === issueParam);
+    if (matchingIssue) {
+      setSelectedNativeIssueId(matchingIssue._id);
+    }
+  }, [resolvedNativeIssues, searchParams]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -224,6 +247,31 @@ export function PlanningView() {
     [resolvedNativeIssues]
   );
 
+  const openNativeIssueDrawer = (issueId: Id<'issues'>) => {
+    setSelectedNativeIssueId(issueId);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('issue', issueId);
+    replacePlanningQuery(nextParams);
+  };
+
+  const closeNativeIssueDrawer = () => {
+    setSelectedNativeIssueId(null);
+    if (!searchParams.get('issue')) return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('issue');
+    replacePlanningQuery(nextParams);
+  };
+
+  const closeNativeIssueModal = () => {
+    setShowNativeIssueModal(false);
+    if (searchParams.get('createIssue') !== '1') return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete('createIssue');
+    replacePlanningQuery(nextParams);
+  };
+
   const handlePushTaskForward = async (taskId: Id<'tasks'>, currentStatus: TaskStatus) => {
     const nextStatus: TaskStatus =
       currentStatus === 'todo'
@@ -268,8 +316,8 @@ export function PlanningView() {
         status: 'backlog',
         dueDate: '',
       });
-      setShowNativeIssueModal(false);
-      setSelectedNativeIssueId(issueId);
+      closeNativeIssueModal();
+      openNativeIssueDrawer(issueId);
     } catch (error) {
       setNativeIssueError(error instanceof Error ? error.message : 'Failed to create issue.');
     } finally {
@@ -511,7 +559,7 @@ export function PlanningView() {
               {activeNativeIssues.slice(0, 8).map((issue) => (
                 <button
                   key={issue._id}
-                  onClick={() => setSelectedNativeIssueId(issue._id)}
+                  onClick={() => openNativeIssueDrawer(issue._id)}
                   className="w-full p-3 bg-[#181818] border border-[#232323] rounded-lg text-left hover:border-[#333] transition-colors"
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -634,7 +682,7 @@ export function PlanningView() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => {
             if (!isCreatingNativeIssue) {
-              setShowNativeIssueModal(false);
+              closeNativeIssueModal();
             }
           }}
         >
@@ -650,7 +698,7 @@ export function PlanningView() {
                 </p>
               </div>
               <button
-                onClick={() => setShowNativeIssueModal(false)}
+                onClick={closeNativeIssueModal}
                 className="p-2 rounded-lg hover:bg-[#181818] text-gray-500 hover:text-white transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -746,7 +794,7 @@ export function PlanningView() {
               <div className="pt-3 border-t border-[#232323] flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowNativeIssueModal(false)}
+                  onClick={closeNativeIssueModal}
                   disabled={isCreatingNativeIssue}
                   className="px-4 py-2 bg-[#181818] rounded-lg text-sm hover:bg-[#232323] transition-colors disabled:opacity-60"
                 >
@@ -769,7 +817,7 @@ export function PlanningView() {
       {selectedNativeIssueId ? (
         <IssueDetailDrawer
           issueId={selectedNativeIssueId}
-          onClose={() => setSelectedNativeIssueId(null)}
+          onClose={closeNativeIssueDrawer}
         />
       ) : null}
     </div>

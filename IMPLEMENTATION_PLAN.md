@@ -156,7 +156,7 @@ Files:
 
 Tasks:
 - global command palette (`Cmd/Ctrl+K`) ✅
-- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + create project route entry + decision + fast status/priority + assignment + cycle move commands for surfaced issues done; project/cycle entity-native commands pending)
+- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + create project + create native issue + decision + fast status/priority + assignment + cycle move commands for surfaced issues done)
 - fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
 - keyboard shortcuts for common issue actions ✅
   - direct global shortcuts for the currently opened task are active:
@@ -350,6 +350,7 @@ npx convex deploy --yes
 - 2026-02-22: added project creation UX polish (new `ProjectsView` CTA/modal, optional kickoff issue, improved filter/toggle spacing).
 - 2026-02-22: added project creation entrypoints from Planning Hub and command palette (`Create Project` -> `/projects?create=1`).
 - 2026-02-22: added native issue collaboration panel in Planning Hub with in-app native issue creation and relation drawer (add/remove issue links + quick status/priority updates).
+- 2026-02-22: added native issue command palette actions (create native issue route, open native issue drawer, native status updates, and quick dependency-link commands).
 
 ## 10) Risks and Mitigations
 

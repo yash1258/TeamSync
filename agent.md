@@ -334,7 +334,7 @@ Convex auth tables are included via `authTables`.
 
 7. Command palette scope is currently foundational:
    - global open/close (`Cmd/Ctrl+K`) and route/work-item search are implemented
-   - quick actions currently cover create issue, create project entrypoint, decision entrypoint, status/priority updates, assignee changes, and cycle moves for surfaced issues
+   - quick actions currently cover create issue, create project entrypoint, create native issue entrypoint, decision entrypoint, status/priority updates, assignee changes, cycle moves, and quick dependency links for surfaced native issues
    - command palette includes a persistent keyboard cheat sheet footer for discoverability
    - direct keyboard shortcuts are available for the currently opened task in `TaskModal`:
      - `Alt+Shift+S` start, `Alt+Shift+D` done, `Alt+Shift+H` high priority

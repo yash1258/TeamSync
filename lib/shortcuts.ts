@@ -80,6 +80,12 @@ export const paletteShortcutDefinitions: Omit<ShortcutDefinition, 'key'>[] = [
     description: 'Open the new project flow',
   },
   {
+    id: 'createNativeIssue',
+    combo: 'Type create native issue',
+    label: 'Create Native Issue',
+    description: 'Open native issue creation in planning',
+  },
+  {
     id: 'navigate',
     combo: 'Arrow Keys',
     label: 'Navigate',

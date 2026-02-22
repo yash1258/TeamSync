@@ -2,6 +2,7 @@
 
 import {
     LayoutDashboard,
+    Compass,
     Kanban,
     Wallet,
     Users,
@@ -22,6 +23,7 @@ import { useTaskModal } from './TaskModalContext';
 
 const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/planning', label: 'Planning Hub', icon: Compass },
     { href: '/tasks', label: 'Task Board', icon: Kanban },
     { href: '/budget', label: 'Budget', icon: Wallet },
     { href: '/team', label: 'Team', icon: Users },

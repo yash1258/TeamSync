@@ -7,6 +7,7 @@ import {
 const isLoginPage = createRouteMatcher(["/login"]);
 const isProtectedRoute = createRouteMatcher([
     "/",
+    "/planning(.*)",
     "/tasks(.*)",
     "/budget(.*)",
     "/team(.*)",

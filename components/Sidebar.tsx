@@ -23,6 +23,7 @@ import { useSidebar } from './SidebarContext';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useTaskModal } from './TaskModalContext';
 import { publicFeatureFlags } from '@/lib/featureFlags';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -43,11 +44,12 @@ const navItems = [
 export function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
-    const { isOpen, toggle } = useSidebar();
+    const { isOpen, toggle, setOpen } = useSidebar();
     const { closeTask } = useTaskModal();
     const { signOut } = useAuthActions();
     const [pendingPath, setPendingPath] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
+    const isMobile = useIsMobile();
 
     useEffect(() => {
         navItems.forEach((item) => router.prefetch(item.href));
@@ -70,12 +72,26 @@ export function Sidebar() {
     const isNavigatingTo = (href: string) => isPending && pendingPath === href;
 
     return (
+        <>
+        {isMobile && isOpen && (
+            <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+                aria-label="Close sidebar overlay"
+            />
+        )}
+
         <aside
-            className={`fixed left-0 top-0 h-full bg-[#0B0B0B] border-r border-[#232323] z-[60] transition-all duration-300 ${isOpen ? 'w-64' : 'w-16'
+            className={`fixed left-0 top-0 h-full bg-[#0B0B0B]/95 border-r border-[#232323] z-[60] transition-all duration-300 ${isMobile
+                ? `w-72 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'}`
+                : isOpen
+                    ? 'w-64'
+                    : 'w-16'
                 }`}
         >
             {/* Logo */}
-            <div className="h-20 flex items-center justify-between px-4 border-b border-[#232323]">
+            <div className="h-16 md:h-20 flex items-center justify-between px-4 border-b border-[#232323]">
                 {isOpen ? (
                     <button type="button" onClick={() => navigateTo('/')} className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-[#F0FF7A] flex items-center justify-center">
@@ -95,14 +111,14 @@ export function Sidebar() {
 
                 <button
                     onClick={toggle}
-                    className={`p-1.5 rounded-lg hover:bg-[#181818] transition-colors ${!isOpen && 'hidden'}`}
+                    className={`p-1.5 rounded-lg hover:bg-[#181818] transition-colors ${!isOpen || isMobile ? 'hidden' : ''}`}
                 >
                     <ChevronLeft className="w-4 h-4 text-gray-400" />
                 </button>
             </div>
 
             {/* Toggle button when collapsed */}
-            {!isOpen && (
+            {!isOpen && !isMobile && (
                 <button
                     onClick={toggle}
                     className="absolute top-6 -right-3 w-6 h-6 bg-[#181818] border border-[#232323] rounded-full flex items-center justify-center hover:bg-[#232323] transition-colors"
@@ -112,7 +128,7 @@ export function Sidebar() {
             )}
 
             {/* Navigation */}
-            <nav className="p-3 space-y-1">
+            <nav className="p-2 md:p-3 space-y-1">
                 {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href;
@@ -179,5 +195,6 @@ export function Sidebar() {
                 </button>
             </div>
         </aside>
+        </>
     );
 }

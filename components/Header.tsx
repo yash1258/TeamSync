@@ -5,6 +5,7 @@ import {
     Search,
     Plus,
     MessageSquare,
+    PanelLeft,
     User,
     Settings,
     LogOut,
@@ -20,9 +21,10 @@ import { AddTaskModal } from './AddTaskModal';
 interface HeaderProps {
     scrolled: boolean;
     onOpenCommandPalette?: () => void;
+    onToggleSidebar?: () => void;
 }
 
-export function Header({ scrolled, onOpenCommandPalette }: HeaderProps) {
+export function Header({ scrolled, onOpenCommandPalette, onToggleSidebar }: HeaderProps) {
     const searchParams = useSearchParams();
     const [showSearch, setShowSearch] = useState(false);
     const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -103,13 +105,24 @@ export function Header({ scrolled, onOpenCommandPalette }: HeaderProps) {
         <>
             <header
                 className={`fixed top-0 right-0 left-0 z-40 transition-all duration-300 ${scrolled
-                    ? 'bg-[#010101]/80 backdrop-blur-xl border-b border-[#232323]'
-                    : 'bg-transparent'
+                    ? 'bg-[rgba(16,26,34,0.72)] backdrop-blur-xl border-b border-[rgba(126,161,186,0.28)]'
+                    : 'bg-[rgba(11,19,27,0.42)] backdrop-blur-md'
                     }`}
                 style={{ marginLeft: 'inherit' }}
             >
-                <div className="h-20 px-4 md:px-6 flex items-center justify-between gap-3">
+                <div className="h-16 md:h-20 px-3 md:px-6 flex items-center justify-between gap-2 md:gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {onToggleSidebar && (
+                            <button
+                                type="button"
+                                onClick={onToggleSidebar}
+                                className="md:hidden p-2.5 rounded-lg bg-[#181818] border border-[#232323] text-gray-300 hover:text-white hover:border-[#333] transition-all duration-200"
+                                aria-label="Toggle sidebar"
+                            >
+                                <PanelLeft className="w-5 h-5" />
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => setShowMobileSearch((prev) => !prev)}
@@ -155,13 +168,13 @@ export function Header({ scrolled, onOpenCommandPalette }: HeaderProps) {
                         <button
                             type="button"
                             onClick={() => setShowAddTaskModal(true)}
-                            className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-3 md:px-4 py-2 rounded-lg font-medium text-sm hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200"
+                            className="flex items-center gap-2 bg-[#F0FF7A] text-[#010101] px-2.5 md:px-4 py-2 rounded-lg font-medium text-sm hover:shadow-lg hover:shadow-[#F0FF7A]/20 transition-all duration-200"
                         >
                             <Plus className="w-4 h-4" />
                             <span className="hidden md:inline">New Task</span>
                         </button>
 
-                        <div className="relative">
+                        <div className="relative hidden sm:block">
                             <button
                                 type="button"
                                 onClick={() => setActiveMenu(activeMenu === 'messages' ? null : 'messages')}
@@ -213,7 +226,7 @@ export function Header({ scrolled, onOpenCommandPalette }: HeaderProps) {
                             )}
                         </div>
 
-                        <div className="relative">
+                        <div className="relative hidden sm:block">
                             <button
                                 type="button"
                                 onClick={() => setActiveMenu(activeMenu === 'notifications' ? null : 'notifications')}

@@ -13,6 +13,7 @@ import { OnboardingModal } from './OnboardingModal';
 import { CommandPalette } from './planning/CommandPalette';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { useGlobalIssueShortcuts } from '@/hooks/useGlobalIssueShortcuts';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -20,9 +21,10 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
     const [scrolled, setScrolled] = useState(false);
-    const { isOpen: isSidebarOpen } = useSidebar();
+    const { isOpen: isSidebarOpen, setOpen: setSidebarOpen, toggle: toggleSidebar } = useSidebar();
     const { selectedTaskId, closeTask } = useTaskModal();
     const pathname = usePathname();
+    const isMobile = useIsMobile();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, openPalette } = useCommandPalette();
 
@@ -44,10 +46,18 @@ export function AppLayout({ children }: AppLayoutProps) {
         selectedTask: selectedTask ?? null,
     });
 
+    useEffect(() => {
+        if (!isMobile) return;
+        setSidebarOpen(false);
+    }, [isMobile, setSidebarOpen]);
+
     // Close an open task modal only when route changes.
     useEffect(() => {
         closeTask();
-    }, [pathname, closeTask]);
+        if (isMobile) {
+            setSidebarOpen(false);
+        }
+    }, [pathname, closeTask, isMobile, setSidebarOpen]);
 
     // Determine if we should show sidebar (not on profile/settings)
     const showSidebar = !pathname.startsWith('/profile') && !pathname.startsWith('/settings');
@@ -61,14 +71,18 @@ export function AppLayout({ children }: AppLayoutProps) {
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#010101] text-white flex">
+        <div className="min-h-screen text-white flex">
             {showSidebar && <Sidebar />}
 
-            <div className={`flex-1 flex flex-col transition-all duration-300 ${showSidebar ? (isSidebarOpen ? 'ml-64' : 'ml-16') : ''
+            <div className={`flex-1 flex flex-col transition-all duration-300 ${showSidebar && !isMobile ? (isSidebarOpen ? 'ml-64' : 'ml-16') : ''
                 }`}>
-                <Header scrolled={scrolled} onOpenCommandPalette={openPalette} />
+                <Header
+                    scrolled={scrolled}
+                    onOpenCommandPalette={openPalette}
+                    onToggleSidebar={showSidebar ? toggleSidebar : undefined}
+                />
 
-                <main className="flex-1 p-6 pt-24">
+                <main className="flex-1 px-3 sm:px-5 md:px-6 pt-20 md:pt-24 pb-6">
                     <div className="max-w-7xl mx-auto">
                         {children}
                     </div>

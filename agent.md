@@ -43,7 +43,15 @@ Recommended first reads:
 - `components/Header.tsx`
 - `components/InviteMemberModal.tsx`
 - `components/TaskModal.tsx`
+- `app/(dashboard)/planning/page.tsx`
+- `app/(dashboard)/projects/page.tsx`
+- `app/(dashboard)/roadmap/page.tsx`
+- `app/(dashboard)/decisions/page.tsx`
 - `sections/TaskBoard.tsx`
+- `sections/PlanningView.tsx`
+- `sections/ProjectsView.tsx`
+- `sections/RoadmapView.tsx`
+- `sections/DecisionsView.tsx`
 - `sections/TeamView.tsx`
 - `sections/SettingsView.tsx`
 - `convex/schema.ts`
@@ -80,6 +88,10 @@ app/
   (dashboard)/
     layout.tsx                    # AuthGuard + Sidebar/Task modal providers
     page.tsx
+    planning/page.tsx
+    projects/page.tsx
+    roadmap/page.tsx
+    decisions/page.tsx
     tasks/page.tsx
     budget/page.tsx
     team/page.tsx
@@ -103,6 +115,10 @@ components/
 
 sections/
   Dashboard.tsx
+  PlanningView.tsx
+  ProjectsView.tsx
+  RoadmapView.tsx
+  DecisionsView.tsx
   TaskBoard.tsx
   BudgetView.tsx
   TeamView.tsx
@@ -140,7 +156,11 @@ Protected app routes are under `app/(dashboard)/*`.
 Server middleware in `middleware.ts`:
 - redirects unauthenticated users away from protected routes to `/login`
 - redirects authenticated users from `/login` to `/`
-- gates `/planning` behind rollout flag (`FEATURE_PLANNING_HUB` / `NEXT_PUBLIC_FEATURE_PLANNING_HUB`)
+- gates planning routes behind rollout flag (`FEATURE_PLANNING_HUB` / `NEXT_PUBLIC_FEATURE_PLANNING_HUB`):
+  - `/planning`
+  - `/projects`
+  - `/roadmap`
+  - `/decisions`
 
 Client-side guard:
 - `components/AuthGuard.tsx` wraps dashboard layout
@@ -164,6 +184,10 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
+- `sections/PlanningView.tsx`
+- `sections/ProjectsView.tsx` (currently derived from `tasks` + tags)
+- `sections/RoadmapView.tsx` (currently derived from `tasks` + milestones)
+- `sections/DecisionsView.tsx` (currently derived from documents + versions)
 - `sections/TaskBoard.tsx`
 - `sections/BudgetView.tsx`
 - `sections/TeamView.tsx`
@@ -187,6 +211,7 @@ Partially local/mock UI state:
 - Uses `useRouter()` push navigation, not plain links.
 - Prefetches main routes in `useEffect`.
 - Uses React transition state for navigation spinner/disabled buttons.
+- Includes planning sub-routes (`/projects`, `/roadmap`, `/decisions`) when planning flag is enabled.
 - Includes `/docs` nav entry.
 - Closes task modal before route transitions.
 
@@ -287,6 +312,11 @@ Convex auth tables are included via `authTables`.
    - stored in `userProfiles.taskSavedViews`
    - capped to a small recent set (currently 8)
    - names are user-defined from a prompt; there is no rename UI yet
+
+6. Planning Phase 2 uses temporary derived data:
+   - `ProjectsView` and `RoadmapView` are sourced from `tasks` + tag conventions (`project:*`)
+   - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
+   - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`
 
 ## 13) Local Development
 

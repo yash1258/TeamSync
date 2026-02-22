@@ -6,10 +6,18 @@ import {
 import { featureFlags } from "@/lib/featureFlags";
 
 const isLoginPage = createRouteMatcher(["/login"]);
-const isPlanningRoute = createRouteMatcher(["/planning(.*)"]);
+const isPlanningRoute = createRouteMatcher([
+    "/planning(.*)",
+    "/projects(.*)",
+    "/roadmap(.*)",
+    "/decisions(.*)",
+]);
 const isProtectedRoute = createRouteMatcher([
     "/",
     "/planning(.*)",
+    "/projects(.*)",
+    "/roadmap(.*)",
+    "/decisions(.*)",
     "/tasks(.*)",
     "/budget(.*)",
     "/team(.*)",

@@ -72,7 +72,7 @@ Gate to proceed:
 
 ### Phase 1: Collaboration Domain Schema
 
-Status: `IN PROGRESS`
+Status: `IN PROGRESS` (schema/modules added; Convex codegen/deploy deferred)
 
 Goal:
 - introduce the core data model needed for Linear-like workflows.
@@ -89,6 +89,7 @@ Tasks:
   - `issues`
   - `issueRelations`
   - `decisions`
+- add table definitions to schema and module scaffolding ✅
 - add indexes for common queries (status, owner, cycle, project, due date) ✅
 - wire baseline CRUD queries/mutations with permission checks ✅
 - ensure activity logging hooks for key mutations ✅
@@ -103,7 +104,7 @@ Gate to proceed:
 
 ### Phase 2: Planning UI Core (Linear-style)
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
 Goal:
 - build first-class planning UX around new schema.
@@ -122,11 +123,13 @@ Files:
   - `components/planning/*`
 
 Tasks:
-- triage inbox for unplanned/unassigned issues
-- project board/list/timeline views
-- cycle planner (current/upcoming/closed)
-- issue detail drawer/modal with relations and activity
-- decision log list + detail + link-to-issue/project
+- triage inbox for unplanned/unassigned issues ✅
+- project board/list/timeline views ✅
+- cycle planner (current/upcoming/closed) ✅
+- issue detail drawer/modal with relations and activity (activity wired, issue-relations UI pending)
+- decision log list + detail + link-to-issue/project ✅
+- dedicated routes and sidebar entries for Projects/Roadmap/Decisions ✅
+- route + middleware rollout gating for planning modules ✅
 
 Acceptance criteria:
 - product team can run weekly planning entirely inside app
@@ -135,6 +138,7 @@ Acceptance criteria:
 
 Gate to proceed:
 - internal dogfood for one full planning cycle
+- complete issue-relations UI in detail drawer
 
 ### Phase 3: Command Palette and Keyboard-First Flow
 

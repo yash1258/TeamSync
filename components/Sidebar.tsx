@@ -3,6 +3,9 @@
 import {
     LayoutDashboard,
     Compass,
+    FolderKanban,
+    Milestone,
+    Scale,
     Kanban,
     Wallet,
     Users,
@@ -25,7 +28,12 @@ import { publicFeatureFlags } from '@/lib/featureFlags';
 const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     ...(publicFeatureFlags.planningHub
-        ? [{ href: '/planning', label: 'Planning Hub', icon: Compass }]
+        ? [
+            { href: '/planning', label: 'Planning Hub', icon: Compass },
+            { href: '/projects', label: 'Projects', icon: FolderKanban },
+            { href: '/roadmap', label: 'Roadmap', icon: Milestone },
+            { href: '/decisions', label: 'Decisions', icon: Scale },
+        ]
         : []),
     { href: '/tasks', label: 'Task Board', icon: Kanban },
     { href: '/budget', label: 'Budget', icon: Wallet },

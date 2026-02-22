@@ -356,6 +356,7 @@ npx convex deploy --yes
 - 2026-02-22: rewired `DecisionsView` to native-first decisions with docs fallback; added in-app native decision creation and linked project/issue/task context.
 - 2026-02-22: added native issue filters (status/project) in Planning Hub for faster issue triage and relation management.
 - 2026-02-22: added native issue batch operations in Planning Hub (multi-select, bulk start/done, assign to me).
+- 2026-02-22: added dashboard planning snapshot (`projects/issues/decisions`) via `api.dashboard.getPlanningSnapshot`.
 
 ## 10) Risks and Mitigations
 
@@ -406,7 +407,7 @@ Status: `IN PROGRESS`
 
 - ship stable linkage for `projects -> issues -> tasks` across create/edit/detail flows ✅
 - add issue-linked task backfill utility for legacy tasks (tag enrichment + conflict report)
-- add project-level rollups combining native issue state + linked task state
+- add project-level rollups combining native issue state + linked task state (Projects/Roadmap/Dashboard slices shipped)
 
 ### B. Native Issue Experience
 

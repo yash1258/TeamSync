@@ -194,6 +194,7 @@ Dashboard layout (`app/(dashboard)/layout.tsx`):
 
 Real Convex-backed sections:
 - `sections/Dashboard.tsx`
+- `sections/Dashboard.tsx` (includes planning snapshot from native projects/issues/decisions)
 - `sections/PlanningView.tsx` (task triage + native issue relation drawer + linked task controls)
 - `sections/ProjectsView.tsx` (hybrid: `projects` table records + task tags)
 - `sections/RoadmapView.tsx` (currently derived from `tasks` + milestones)

@@ -145,3 +145,42 @@ export const getDueTasks = query({
         return dueTasksWithAssignee;
     },
 });
+
+// Get planning-level snapshot (projects/issues/decisions)
+export const getPlanningSnapshot = query({
+    args: {},
+    handler: async (ctx) => {
+        const [projects, issues, decisions] = await Promise.all([
+            ctx.db.query("projects").collect(),
+            ctx.db.query("issues").collect(),
+            ctx.db.query("decisions").collect(),
+        ]);
+
+        const activeProjects = projects.filter(
+            (project) => project.status === "active" || project.status === "planned"
+        ).length;
+        const doneProjects = projects.filter((project) => project.status === "done").length;
+
+        const openIssues = issues.filter(
+            (issue) => issue.status !== "done" && issue.status !== "canceled"
+        ).length;
+        const inProgressIssues = issues.filter((issue) => issue.status === "in-progress").length;
+        const doneIssues = issues.filter((issue) => issue.status === "done").length;
+
+        const proposedDecisions = decisions.filter((decision) => decision.status === "proposed").length;
+        const acceptedDecisions = decisions.filter((decision) => decision.status === "accepted").length;
+
+        return {
+            totalProjects: projects.length,
+            activeProjects,
+            doneProjects,
+            totalIssues: issues.length,
+            openIssues,
+            inProgressIssues,
+            doneIssues,
+            totalDecisions: decisions.length,
+            proposedDecisions,
+            acceptedDecisions,
+        };
+    },
+});

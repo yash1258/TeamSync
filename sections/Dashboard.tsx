@@ -40,6 +40,7 @@ export function Dashboard() {
 
     // Fetch real data from Convex
     const dashboardStats = useQuery(api.dashboard.getStats);
+    const planningSnapshot = useQuery(api.dashboard.getPlanningSnapshot);
     const recentTasks = useQuery(api.tasks.listRecent, { limit: 4 });
     const activityLog = useQuery(api.dashboard.getActivity, { limit: 4 });
     const currentUser = useQuery(api.users.currentUser);
@@ -183,7 +184,12 @@ export function Dashboard() {
     const firstName = currentUser?.name?.split(' ')[0] ?? 'there';
 
     // Loading state
-    if (dashboardStats === undefined || recentTasks === undefined || activityLog === undefined) {
+    if (
+        dashboardStats === undefined ||
+        planningSnapshot === undefined ||
+        recentTasks === undefined ||
+        activityLog === undefined
+    ) {
         return (
             <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-[#F0FF7A]" />
@@ -229,6 +235,43 @@ export function Dashboard() {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Planning Snapshot */}
+            <div className="animate-on-scroll opacity-0 bg-[#0B0B0B] border border-[#232323] rounded-xl p-5">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="font-semibold">Planning Snapshot</h2>
+                    <span className="text-xs text-gray-500">Projects • Issues • Decisions</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-[#181818] border border-[#232323] rounded-lg p-3">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Projects</p>
+                        <p className="text-xl font-semibold mt-1">
+                            {planningSnapshot.activeProjects}/{planningSnapshot.totalProjects}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            active + planned • {planningSnapshot.doneProjects} done
+                        </p>
+                    </div>
+                    <div className="bg-[#181818] border border-[#232323] rounded-lg p-3">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Native Issues</p>
+                        <p className="text-xl font-semibold mt-1">
+                            {planningSnapshot.openIssues}/{planningSnapshot.totalIssues}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            open • {planningSnapshot.inProgressIssues} in-progress • {planningSnapshot.doneIssues} done
+                        </p>
+                    </div>
+                    <div className="bg-[#181818] border border-[#232323] rounded-lg p-3">
+                        <p className="text-xs text-gray-500 uppercase tracking-wide">Decisions</p>
+                        <p className="text-xl font-semibold mt-1">
+                            {planningSnapshot.proposedDecisions}/{planningSnapshot.totalDecisions}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            proposed • {planningSnapshot.acceptedDecisions} accepted
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Main Content Grid */}

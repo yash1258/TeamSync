@@ -91,6 +91,7 @@ export function PlanningView() {
 
   const updateStatus = useMutation(api.tasks.updateStatus);
   const createIssue = useMutation(api.issues.create);
+  const updateNativeIssue = useMutation(api.issues.update);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showNativeIssueModal, setShowNativeIssueModal] = useState(false);
@@ -103,6 +104,8 @@ export function PlanningView() {
     'all' | 'active' | NativeIssueStatus
   >('active');
   const [nativeIssueProjectFilter, setNativeIssueProjectFilter] = useState<string>('all');
+  const [selectedNativeIssueIds, setSelectedNativeIssueIds] = useState<Id<'issues'>[]>([]);
+  const [isApplyingNativeBatch, setIsApplyingNativeBatch] = useState(false);
   const [nativeIssueDraft, setNativeIssueDraft] = useState({
     title: '',
     description: '',
@@ -277,6 +280,12 @@ export function PlanningView() {
     [resolvedNativeIssues]
   );
 
+  useEffect(() => {
+    if (selectedNativeIssueIds.length === 0) return;
+    const visibleIds = new Set(filteredNativeIssues.map((issue) => issue._id));
+    setSelectedNativeIssueIds((current) => current.filter((id) => visibleIds.has(id)));
+  }, [filteredNativeIssues, selectedNativeIssueIds.length]);
+
   const openNativeIssueDrawer = (issueId: Id<'issues'>) => {
     setSelectedNativeIssueId(issueId);
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -300,6 +309,53 @@ export function PlanningView() {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete('createIssue');
     replacePlanningQuery(nextParams);
+  };
+
+  const toggleNativeIssueSelection = (issueId: Id<'issues'>) => {
+    setSelectedNativeIssueIds((current) =>
+      current.includes(issueId)
+        ? current.filter((id) => id !== issueId)
+        : [...current, issueId]
+    );
+  };
+
+  const selectAllVisibleNativeIssues = () => {
+    setSelectedNativeIssueIds(filteredNativeIssues.map((issue) => issue._id));
+  };
+
+  const clearNativeIssueSelection = () => {
+    setSelectedNativeIssueIds([]);
+  };
+
+  const handleBatchUpdateNativeIssues = async (
+    updates: {
+      status?: NativeIssueStatus;
+      assigneeId?: Id<'teamMembers'>;
+    },
+    emptySelectionMessage: string
+  ) => {
+    if (selectedNativeIssueIds.length === 0) {
+      setNativeIssueError(emptySelectionMessage);
+      return;
+    }
+
+    setNativeIssueError(null);
+    setIsApplyingNativeBatch(true);
+    try {
+      await Promise.all(
+        selectedNativeIssueIds.map((issueId) =>
+          updateNativeIssue({
+            id: issueId,
+            ...updates,
+          })
+        )
+      );
+      clearNativeIssueSelection();
+    } catch (error) {
+      setNativeIssueError(error instanceof Error ? error.message : 'Failed to apply issue updates.');
+    } finally {
+      setIsApplyingNativeBatch(false);
+    }
   };
 
   const handlePushTaskForward = async (taskId: Id<'tasks'>, currentStatus: TaskStatus) => {
@@ -612,47 +668,129 @@ export function PlanningView() {
             </div>
           </div>
 
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {selectedNativeIssueIds.length} selected
+            </span>
+            <button
+              onClick={selectAllVisibleNativeIssues}
+              disabled={filteredNativeIssues.length === 0 || isApplyingNativeBatch}
+              className="px-2.5 py-1.5 rounded border border-[#2A2A2A] bg-[#161616] text-xs hover:border-[#3A3A3A] disabled:opacity-60"
+            >
+              Select Visible
+            </button>
+            <button
+              onClick={clearNativeIssueSelection}
+              disabled={selectedNativeIssueIds.length === 0 || isApplyingNativeBatch}
+              className="px-2.5 py-1.5 rounded border border-[#2A2A2A] bg-[#161616] text-xs hover:border-[#3A3A3A] disabled:opacity-60"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() =>
+                void handleBatchUpdateNativeIssues(
+                  { status: 'in-progress' },
+                  'Select issues before updating status.'
+                )
+              }
+              disabled={selectedNativeIssueIds.length === 0 || isApplyingNativeBatch}
+              className="px-2.5 py-1.5 rounded border border-[#2A2A2A] bg-[#161616] text-xs hover:border-[#3A3A3A] disabled:opacity-60"
+            >
+              Start
+            </button>
+            <button
+              onClick={() =>
+                void handleBatchUpdateNativeIssues(
+                  { status: 'done' },
+                  'Select issues before marking done.'
+                )
+              }
+              disabled={selectedNativeIssueIds.length === 0 || isApplyingNativeBatch}
+              className="px-2.5 py-1.5 rounded border border-[#2A2A2A] bg-[#161616] text-xs hover:border-[#3A3A3A] disabled:opacity-60"
+            >
+              Done
+            </button>
+            <button
+              onClick={() =>
+                void handleBatchUpdateNativeIssues(
+                  currentMember?._id ? { assigneeId: currentMember._id } : {},
+                  currentMember?._id
+                    ? 'Select issues before assigning.'
+                    : 'Join the team before assigning issues.'
+                )
+              }
+              disabled={selectedNativeIssueIds.length === 0 || !currentMember?._id || isApplyingNativeBatch}
+              className="px-2.5 py-1.5 rounded border border-[#2A2A2A] bg-[#161616] text-xs hover:border-[#3A3A3A] disabled:opacity-60"
+            >
+              Assign Me
+            </button>
+            {isApplyingNativeBatch ? (
+              <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Applying...
+              </span>
+            ) : null}
+          </div>
+          {nativeIssueError ? <p className="mb-3 text-xs text-red-400">{nativeIssueError}</p> : null}
+
           {filteredNativeIssues.length === 0 ? (
             <p className="text-sm text-gray-500">
               No native issues found for the selected filters. Create one to start linking dependencies.
             </p>
           ) : (
             <div className="space-y-2">
-              {filteredNativeIssues.slice(0, 8).map((issue) => (
-                <button
-                  key={issue._id}
-                  onClick={() => openNativeIssueDrawer(issue._id)}
-                  className="w-full p-3 bg-[#181818] border border-[#232323] rounded-lg text-left hover:border-[#333] transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium truncate">{issue.title}</p>
-                    <span className={`text-[10px] px-2 py-1 rounded ${getPriorityClass(issue.priority)}`}>
-                      {issue.priority}
-                    </span>
+              {filteredNativeIssues.slice(0, 8).map((issue) => {
+                const isSelected = selectedNativeIssueIds.includes(issue._id);
+                return (
+                  <div
+                    key={issue._id}
+                    className={`w-full p-3 bg-[#181818] border rounded-lg text-left transition-colors ${
+                      isSelected ? 'border-[#F0FF7A]/60' : 'border-[#232323] hover:border-[#333]'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleNativeIssueSelection(issue._id)}
+                        className="mt-1 rounded border-[#2C2C2C] bg-[#181818]"
+                      />
+                      <button
+                        onClick={() => openNativeIssueDrawer(issue._id)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium truncate">{issue.title}</p>
+                          <span className={`text-[10px] px-2 py-1 rounded ${getPriorityClass(issue.priority)}`}>
+                            {issue.priority}
+                          </span>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-2">
+                          <span>{issue.status}</span>
+                          {issue.projectTitle ? (
+                            <>
+                              <span>•</span>
+                              <span>{issue.projectTitle}</span>
+                            </>
+                          ) : null}
+                          {issue.cycleName ? (
+                            <>
+                              <span>•</span>
+                              <span>{issue.cycleName}</span>
+                            </>
+                          ) : null}
+                          {issue.dueDate ? (
+                            <>
+                              <span>•</span>
+                              <span>Due {issue.dueDate}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500 flex flex-wrap items-center gap-2">
-                    <span>{issue.status}</span>
-                    {issue.projectTitle ? (
-                      <>
-                        <span>•</span>
-                        <span>{issue.projectTitle}</span>
-                      </>
-                    ) : null}
-                    {issue.cycleName ? (
-                      <>
-                        <span>•</span>
-                        <span>{issue.cycleName}</span>
-                      </>
-                    ) : null}
-                    {issue.dueDate ? (
-                      <>
-                        <span>•</span>
-                        <span>Due {issue.dueDate}</span>
-                      </>
-                    ) : null}
-                  </div>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

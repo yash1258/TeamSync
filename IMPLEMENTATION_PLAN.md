@@ -355,6 +355,7 @@ npx convex deploy --yes
 - 2026-02-22: rewired `RoadmapView` to native-first windows (`projects` + `issues`) with task fallback, mixed Now/Next work queues, and issue deep-links.
 - 2026-02-22: rewired `DecisionsView` to native-first decisions with docs fallback; added in-app native decision creation and linked project/issue/task context.
 - 2026-02-22: added native issue filters (status/project) in Planning Hub for faster issue triage and relation management.
+- 2026-02-22: added native issue batch operations in Planning Hub (multi-select, bulk start/done, assign to me).
 
 ## 10) Risks and Mitigations
 
@@ -413,7 +414,7 @@ Status: `IN PROGRESS`
 
 - issue detail drawer with relation CRUD, quick state updates, and linked task creation/linking ✅
 - add richer issue filters (project, cycle, assignee, status) in Planning Hub (`project` + `status` shipped)
-- add batch operations (assign, move status, cycle) for selected native issues
+- add batch operations (assign, move status, cycle) for selected native issues (`assign` + status updates shipped; cycle batching pending)
 
 ### C. Planning Surfaces Consistency
 

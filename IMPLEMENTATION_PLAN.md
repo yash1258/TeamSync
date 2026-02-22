@@ -45,7 +45,7 @@ Out of scope for now:
 
 ### Phase 0: Foundation and Guardrails
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
 Goal:
 - establish safe migration and rollout controls before adding core entities.
@@ -57,10 +57,10 @@ Files:
 - `agent.md`
 
 Tasks:
-- add feature flags for planning modules (server-side + UI guard)
-- define migration policy (`tasks` coexists with new `issues`)
-- define naming conventions and ID/reference patterns
-- update docs for migration/runbook expectations
+- add feature flags for planning modules (server-side + UI guard) ✅
+- define migration policy (`tasks` coexists with new `issues`) ✅
+- define naming conventions and ID/reference patterns ✅
+- update docs for migration/runbook expectations ✅
 
 Acceptance criteria:
 - plan rollout can be toggled per route/section
@@ -336,3 +336,25 @@ npx convex deploy --yes
 
 - Risk: hidden permission regressions.
   - Mitigation: preserve server-side checks as source of truth and test mutations directly.
+
+## 10) Migration and Naming Conventions
+
+These conventions are the Phase 0 source of truth.
+
+Migration policy:
+- keep existing `tasks` as the execution backbone while introducing `issues`
+- do not hard-delete or repurpose `tasks` fields during early phases
+- prefer additive schema changes and dual-read adapters during cutover periods
+- only deprecate old paths after parity validation and one full dogfood cycle
+
+Naming policy:
+- Convex modules: singular domain files (`issues.ts`, `projects.ts`, `cycles.ts`)
+- table names: plural nouns (`issues`, `projects`, `cycles`, `decisions`)
+- reference fields: `<entity>Id` and always typed to table ids
+- relation tables: explicit directional fields (`fromIssueId`, `toIssueId`)
+- context graph edge types: lower_snake_case verbs/nouns (`depends_on`, `informed_by`, `related_to`)
+
+ID/reference patterns:
+- never pass client-trusted identity for ownership/audit; resolve from auth on server
+- log activity for key state transitions in planning modules
+- indexes are required for list queries that power dashboard/planning landing views

@@ -20,10 +20,13 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSidebar } from './SidebarContext';
 import { useAuthActions } from '@convex-dev/auth/react';
 import { useTaskModal } from './TaskModalContext';
+import { publicFeatureFlags } from '@/lib/featureFlags';
 
 const navItems = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/planning', label: 'Planning Hub', icon: Compass },
+    ...(publicFeatureFlags.planningHub
+        ? [{ href: '/planning', label: 'Planning Hub', icon: Compass }]
+        : []),
     { href: '/tasks', label: 'Task Board', icon: Kanban },
     { href: '/budget', label: 'Budget', icon: Wallet },
     { href: '/team', label: 'Team', icon: Users },

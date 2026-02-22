@@ -128,6 +128,7 @@ Protected app routes are under `app/(dashboard)/*`.
 Server middleware in `middleware.ts`:
 - redirects unauthenticated users away from protected routes to `/login`
 - redirects authenticated users from `/login` to `/`
+- gates `/planning` behind rollout flag (`FEATURE_PLANNING_HUB` / `NEXT_PUBLIC_FEATURE_PLANNING_HUB`)
 
 Client-side guard:
 - `components/AuthGuard.tsx` wraps dashboard layout
@@ -294,6 +295,9 @@ Detailed operational steps are documented in local `DEPLOYMENT.md` (intentionall
 
 General rule:
 - when touching deployment, keep `NEXT_PUBLIC_*` env handling valid at both build time and runtime.
+- planning rollout requires both env vars to be set for expected behavior:
+  - `NEXT_PUBLIC_FEATURE_PLANNING_HUB`
+  - `FEATURE_PLANNING_HUB`
 
 ## 15) Agent Editing Guidance for This Repo
 

@@ -3,8 +3,10 @@ import {
     createRouteMatcher,
     nextjsMiddlewareRedirect,
 } from "@convex-dev/auth/nextjs/server";
+import { featureFlags } from "@/lib/featureFlags";
 
 const isLoginPage = createRouteMatcher(["/login"]);
+const isPlanningRoute = createRouteMatcher(["/planning(.*)"]);
 const isProtectedRoute = createRouteMatcher([
     "/",
     "/planning(.*)",
@@ -18,6 +20,10 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
+    if (isPlanningRoute(request) && !featureFlags.planningHub) {
+        return nextjsMiddlewareRedirect(request, "/");
+    }
+
     // If user is on login page and already authenticated, redirect to dashboard
     if (isLoginPage(request) && (await convexAuth.isAuthenticated())) {
         return nextjsMiddlewareRedirect(request, "/");

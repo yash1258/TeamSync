@@ -19,9 +19,10 @@ import { AddTaskModal } from './AddTaskModal';
 
 interface HeaderProps {
     scrolled: boolean;
+    onOpenCommandPalette?: () => void;
 }
 
-export function Header({ scrolled }: HeaderProps) {
+export function Header({ scrolled, onOpenCommandPalette }: HeaderProps) {
     const searchParams = useSearchParams();
     const [showSearch, setShowSearch] = useState(false);
     const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -133,6 +134,21 @@ export function Header({ scrolled }: HeaderProps) {
                                 onBlur={() => setShowSearch(false)}
                             />
                         </form>
+
+                        {onOpenCommandPalette && (
+                            <button
+                                type="button"
+                                onClick={onOpenCommandPalette}
+                                className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-[#181818] border border-[#232323] text-gray-400 hover:text-white hover:border-[#333] transition-colors"
+                                aria-label="Open command palette"
+                            >
+                                <Search className="w-4 h-4" />
+                                <span className="text-xs">Command</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#0F0F0F] border border-[#232323] text-gray-500">
+                                    Cmd/Ctrl+K
+                                </span>
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-3" ref={menuRef}>

@@ -142,7 +142,7 @@ Gate to proceed:
 
 ### Phase 3: Command Palette and Keyboard-First Flow
 
-Status: `PLANNED`
+Status: `IN PROGRESS`
 
 Goal:
 - improve speed and reduce UI friction for day-to-day collaboration.
@@ -153,10 +153,10 @@ Files:
 - `hooks/useCommandPalette.ts`
 
 Tasks:
-- global command palette (`Cmd/Ctrl+K`)
-- quick actions: create issue/project/decision, move cycle, assign, change status/priority
-- fuzzy search over issues/projects/decisions/docs
-- keyboard shortcuts for common issue actions
+- global command palette (`Cmd/Ctrl+K`) ✅
+- quick actions: create issue/project/decision, move cycle, assign, change status/priority (create issue + decision shortcut done; cycle/assignment/status actions pending)
+- fuzzy search over issues/projects/decisions/docs (issues + decisions + route/search navigation done; richer project/doc entity search pending)
+- keyboard shortcuts for common issue actions (palette navigation shortcuts done; issue action shortcuts pending)
 
 Acceptance criteria:
 - key workflows can be completed without mouse-heavy navigation

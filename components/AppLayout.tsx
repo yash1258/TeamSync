@@ -10,6 +10,8 @@ import { useTaskModal } from './TaskModalContext';
 import { useQuery, useConvexAuth } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { OnboardingModal } from './OnboardingModal';
+import { CommandPalette } from './planning/CommandPalette';
+import { useCommandPalette } from '@/hooks/useCommandPalette';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -17,10 +19,11 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
     const [scrolled, setScrolled] = useState(false);
-    const { isOpen } = useSidebar();
+    const { isOpen: isSidebarOpen } = useSidebar();
     const { selectedTaskId, closeTask } = useTaskModal();
     const pathname = usePathname();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+    const { isOpen: isCommandPaletteOpen, setIsOpen: setIsCommandPaletteOpen, openPalette } = useCommandPalette();
 
     // Check if user is a team member
     const currentMember = useQuery(api.teamMembers.getCurrentMember);
@@ -51,9 +54,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         <div className="min-h-screen bg-[#010101] text-white flex">
             {showSidebar && <Sidebar />}
 
-            <div className={`flex-1 flex flex-col transition-all duration-300 ${showSidebar ? (isOpen ? 'ml-64' : 'ml-16') : ''
+            <div className={`flex-1 flex flex-col transition-all duration-300 ${showSidebar ? (isSidebarOpen ? 'ml-64' : 'ml-16') : ''
                 }`}>
-                <Header scrolled={scrolled} />
+                <Header scrolled={scrolled} onOpenCommandPalette={openPalette} />
 
                 <main className="flex-1 p-6 pt-24">
                     <div className="max-w-7xl mx-auto">
@@ -65,6 +68,8 @@ export function AppLayout({ children }: AppLayoutProps) {
             {selectedTaskId && (
                 <TaskModal taskId={selectedTaskId} onClose={closeTask} />
             )}
+
+            <CommandPalette open={isCommandPaletteOpen} onOpenChange={setIsCommandPaletteOpen} />
 
             <OnboardingModal isOpen={showOnboarding} onClose={() => { }} />
         </div>

@@ -43,6 +43,7 @@ Recommended first reads:
 - `components/Header.tsx`
 - `components/InviteMemberModal.tsx`
 - `components/TaskModal.tsx`
+- `components/planning/CommandPalette.tsx`
 - `app/(dashboard)/planning/page.tsx`
 - `app/(dashboard)/projects/page.tsx`
 - `app/(dashboard)/roadmap/page.tsx`
@@ -54,6 +55,7 @@ Recommended first reads:
 - `sections/DecisionsView.tsx`
 - `sections/TeamView.tsx`
 - `sections/SettingsView.tsx`
+- `hooks/useCommandPalette.ts`
 - `convex/schema.ts`
 - `convex/users.ts`
 - `convex/tasks.ts`
@@ -104,6 +106,7 @@ components/
   AppLayout.tsx
   Sidebar.tsx
   Header.tsx
+  planning/CommandPalette.tsx
   AddTaskModal.tsx
   TaskModal.tsx
   AuthGuard.tsx
@@ -112,6 +115,9 @@ components/
   SidebarContext.tsx
   TaskModalContext.tsx
   ui/*
+
+hooks/
+  useCommandPalette.ts
 
 sections/
   Dashboard.tsx
@@ -218,6 +224,7 @@ Partially local/mock UI state:
 ### Header (`components/Header.tsx`)
 
 - Search routes to `/tasks?q=...`
+- Command palette opens via header trigger or `Cmd/Ctrl+K` (`components/planning/CommandPalette.tsx`, `hooks/useCommandPalette.ts`)
 - Real dropdown data:
   - team activity from `api.dashboard.getActivity`
   - due alerts from `api.dashboard.getDueTasks`
@@ -317,6 +324,11 @@ Convex auth tables are included via `authTables`.
    - `ProjectsView` and `RoadmapView` are sourced from `tasks` + tag conventions (`project:*`)
    - `DecisionsView` is sourced from documents tagged/typed as decision/ADR
    - after running Convex codegen/deploy for the new planning tables, these views should be rewired to `projects`, `issues`, `cycles`, and `decisions`
+
+7. Command palette scope is currently foundational:
+   - global open/close (`Cmd/Ctrl+K`) and route/work-item search are implemented
+   - quick actions currently cover create issue + decision entrypoint
+   - advanced issue mutation shortcuts (assign/status/priority/cycle move) are pending
 
 ## 13) Local Development
 
